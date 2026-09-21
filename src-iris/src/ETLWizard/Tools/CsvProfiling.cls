@@ -168,6 +168,7 @@ Method InferCsvTypes(fileName As %String) As %String
                 1: "INTEGER",
                 2: "NUMERIC(18,4)",
                 3: "DATE",
+                4: "TIMESTAMP",
                 : "VARCHAR(" _ $Select(maxLen(c) < 50: 50, 1: maxLen(c) * 2) _ ")")
             Set defs = defs _ $Select(defs = "": "", 1: ", ") _ colName _ " " _ sqlType
             Do report.%Push({"column": (colName), "type": (sqlType)})
@@ -304,7 +305,7 @@ ClassMethod SafeColumnName(raw As %String, position As %Integer) As %String [ In
     Return $Extract(out, 1, 60)
 }
 
-/// 1=INTEGER 2=NUMERIC 3=DATE 4=VARCHAR (0 = empty/unknown)
+/// 1=INTEGER 2=NUMERIC 3=DATE 4=TIMESTAMP 5=VARCHAR (0 = empty/unknown)
 ClassMethod InferValueType(v As %String) As %Integer [ Internal, Private ]
 {
     If v = "" {
@@ -321,7 +322,29 @@ ClassMethod InferValueType(v As %String) As %Integer [ Internal, Private ]
     If (v ? 4N1"-"2N1"-"2N) || (v ? 2N1"/"2N1"/"4N) {
         Return 3
     }
-    Return 4
+    // ISO-8601 date+time, with either separator and with or without seconds or
+    // a fractional part. Weather_Data_1980_2024(hourly).csv is all
+    // "1980-01-01T00:00"; without this arm every value fell through to VARCHAR,
+    // the foreign table column came out VARCHAR, TableColumns() flagged it
+    // non-temporal, and the ML step reported "no date/time column on this
+    // table" for a file that is nothing but timestamps.
+    If (v ? 4N1"-"2N1"-"2N1(1"T",1" ")2N1":"2N) ||
+       (v ? 4N1"-"2N1"-"2N1(1"T",1" ")2N1":"2N1":"2N) ||
+       (v ? 4N1"-"2N1"-"2N1(1"T",1" ")2N1":"2N1":"2N1"."1.N) {
+        Return 4
+    }
+    // Slash date + time, which is how INMET publishes its hourly station data:
+    // "01/01/2025 00:00:00.000000". The bare-date arm above does not match once
+    // a time is attached, so these columns fell through to VARCHAR and the ML
+    // step then reported the table as having no date/time column. Which of the
+    // first two components is the day is decided per file from the data, in
+    // BulkLoad:DayFirst() - it is not knowable from a single value.
+    If (v ? 2N1"/"2N1"/"4N1" "2N1":"2N) ||
+       (v ? 2N1"/"2N1"/"4N1" "2N1":"2N1":"2N) ||
+       (v ? 2N1"/"2N1"/"4N1" "2N1":"2N1":"2N1"."1.N) {
+        Return 4
+    }
+    Return 5
 }
 
 }

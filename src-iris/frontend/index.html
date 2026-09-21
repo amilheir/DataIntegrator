@@ -1969,6 +1969,7 @@ const EXECGUIDE = {
   indexes:    "Optional: tune this target for the questions you will ask of it. It changes nothing about the data.",
   ml:         "Build a model on the data you have just curated &mdash; create it, train it, check how well it scores, then see its predictions.",
   mlmodel:    "Name the model, pick the table it learns from, and choose what you want it to predict.",
+  mlexisting: "This model already exists. Decide what to do with it: learn again from fresh data, check how well it scores, or just look at what it predicts.",
   mltrain:    "Training runs in the background, so this stays responsive while it works.",
   mlvalidate: "Score the model against real data and read the result.",
   kg:         "Turn free text &mdash; descriptions, feedback, notes &mdash; into something the database can search by meaning, and into a map of what it talks about.",
@@ -2540,7 +2541,13 @@ async function wizardStepBulk() {
       wiz.bulk = c.querySelector(".b_bulk").checked; wiz.bulkDelim = c.querySelector(".b_delim").value;
       wiz.deployed = true; wizGraphActive = true; syncBulkGraph(); wizGraphActive = false;
       graphFrozen = true; snapshotGraph($("pipeid").value);
-      wrecap(`<b>Ingested.</b> Moved <b>${load.rowsLoaded !== undefined ? load.rowsLoaded : "?"}</b> row(s) into ` +
+      // On an append, rowsLoaded is the table TOTAL, not what this file added -
+      // reporting it as "moved N rows" reads as though the file had N rows.
+      const moved = load.appended
+        ? `Appended <b>${load.rowsAdded}</b> row(s) onto ${load.rowsBefore} already there ` +
+          `(<b>${load.rowsLoaded}</b> in total) in `
+        : `Moved <b>${load.rowsLoaded !== undefined ? load.rowsLoaded : "?"}</b> row(s) into `;
+      wrecap(`<b>Ingested.</b> ${moved}` +
         `<b>${esc(load.target || "ETLWIZARD.ext_" + base)}</b> via ${wiz.bulk ? "LOAD BULK DATA" : "LOAD DATA"}` +
         (j.note ? `.<br><span class="w_details">${esc(j.note)}</span>` : "") +
         `.<br>It is now a source like any other: build an ETL from it on <b>ETL Interop</b>, ` +
@@ -2603,7 +2610,9 @@ async function wizardStepBulk() {
       msg.classList.remove("busyspin");
       if (j.error) { msg.textContent = j.error; return; }
       wiz.bulkFile = j.csvFile; wiz.bulkDefs = j.columnDefs || "";
-      wiz.targetBase = (j.csvFile || "bulk_data").replace(/\.csv$/i, "");
+      // Sanitise here, not just at submit: the field is what the user sees and
+      // edits, so it has to hold a name the server will actually accept.
+      wiz.targetBase = sqlSafeName((j.csvFile || "bulk_data").replace(/\.csv$/i, "")) || "bulk_data";
       card.querySelector(".b_base").value = wiz.targetBase;
       const cols = card.querySelector(".b_cols");
       cols.dataset.defs = wiz.bulkDefs;
@@ -3238,7 +3247,9 @@ async function offerTransformChoice() {
   syncPicked();
 }
 
-/// Scaffold shown while the model works out the real join.
+/// Starting point for a multi-table transform. The join keys are left blank on
+/// purpose: the SQL agent only runs when the user prompts it (Generate SQL), so
+/// this is a skeleton to edit by hand or to hand to the model.
 function joinScaffold(tables) {
   const al = i => String.fromCharCode(97 + i);
   const cols = tables.map((t, i) => `${al(i)}.*`).join(", ");
@@ -3264,7 +3275,7 @@ FROM ETLWIZARD.${first} a
 -- filtering:      WHERE a.status = 'paid'`);
   wguide("<b>The load SQL.</b> Tables in this ETL: " +
     (picked.length ? picked.map(t => `<code>ETLWIZARD.${esc(t)}</code>`).join(", ") : "<i>none selected</i>") +
-    (multi ? "<br>The model is working out how they join &mdash; the SQL will appear below in a moment." : "") +
+    (multi ? "<br>The join keys are left blank &mdash; fill them in, or press <b>Generate SQL</b> and the model works them out." : "") +
     "<br>You can describe any transformation in plain words (cleansing, standardization, " +
     "derivation, aggregation, filtering) and the model rewrites the SQL, or edit it by hand. " +
     "<b>Preview</b> checks the columns and a sample; the target table is built to match. " +
@@ -3326,11 +3337,13 @@ FROM ETLWIZARD.${first} a
   card.querySelector(".w_gen").onclick = e => { e.preventDefault(); generate(); };
   aiInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); generate(); } });
 
-  // Several tables picked: let the model discover the join keys and write the
-  // combined SELECT straight away (the user never types a join key).
+  // Several tables picked: the model can discover the join keys, but it only
+  // runs when the user asks it to. Entering this step used to fire a generate()
+  // on its own, which spent a minute of local-model time before anyone had said
+  // what they wanted. Pre-fill the prompt instead - one click, still the user's.
   if (multi) {
-    generate("Join these tables into one result and select all columns from each. " +
-      "Work out the join keys yourself from the columns they have in common.");
+    aiInput.value = "Join these tables into one result and select all columns from each. " +
+      "Work out the join keys yourself from the columns they have in common.";
   }
 
   card.querySelector(".w_prev").onclick = async () => {
@@ -4342,7 +4355,8 @@ async function renderMlTab() {
     `<label>Existing models <select class="m_pick">` +
       `<option value="">&mdash; new model &mdash;</option>` +
       models.map(m => `<option value="${esc(m.name)}">${esc(m.name)} &middot; ${esc(m.target)}` +
-        `${m.trained ? " &middot; trained" : ""}${m.timeSeries ? " &middot; time series" : ""}</option>`).join("") +
+        `${m.trained ? " &middot; trained" : ""}${m.validated ? " &middot; validated" : ""}` +
+        `${m.timeSeries ? " &middot; time series" : ""}</option>`).join("") +
     `</select></label>
      <button class="m_new" style="font-family:Newsreader,serif;font-weight:700;font-size:.76rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:10px;padding:.32rem .7rem;cursor:pointer">+ New model</button>
      <button class="m_custom" style="font-family:Newsreader,serif;font-weight:700;font-size:.76rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:10px;padding:.32rem .7rem;cursor:pointer">Custom models...</button>`,
@@ -4357,8 +4371,50 @@ async function renderMlTab() {
     ML.models = [name];
     ML.table = ((m && m.trainingQuery) || "").replace(/^.* FROM /i, "").replace(/\s+/g, "");
     await mlDrawGraph(name);
-    mlStepTrain(m);
+    mlStepExisting(m);
   };
+}
+
+// Step 2, for a model picked off the list. Selecting an existing model used to
+// drop straight into Train, so retraining was the only thing the UI offered to
+// do with a model that was already trained - validating or just looking at its
+// predictions meant training it again first to get past this step. What happens
+// next is the user's call.
+async function mlStepExisting(m) {
+  const trained = !!(m && m.trained);
+  const validated = !!(m && m.validated);
+  wguide("<b>Step 2 &middot; What next?</b> This model already exists, so there is nothing " +
+    "to create. <b>Train</b> fits it again &mdash; on a different table, or on the same one " +
+    "now that it holds more rows &mdash; and replaces what it learned before. " +
+    "<b>Validate</b> scores it against a table and reads the metrics back; run it on data " +
+    "the model was not trained on if you want the numbers to mean anything. " +
+    "<b>Test</b> skips straight to predictions: a plain <code>SELECT</code> with the model " +
+    "applied as extra columns, writing nothing. " +
+    (trained ? "" : "It has not been trained yet, so validating and testing are not available " +
+      "until it has been."), "", "mlexisting");
+  const bstyle = (primary, on) =>
+    `font-family:Newsreader,serif;font-weight:700;font-size:.78rem;` +
+    `background:${on ? (primary ? "var(--teal-fill)" : "var(--card)") : "var(--card)"};` +
+    `color:${on ? (primary ? "var(--on-teal)" : "var(--ink)") : "var(--ink-soft)"};` +
+    `border:1.5px solid ${on ? (primary ? "var(--teal-fill)" : "var(--ink)") : "var(--rule)"};` +
+    `border-radius:10px;padding:.4rem .9rem;cursor:${on ? "pointer" : "not-allowed"};` +
+    `${on ? "box-shadow:var(--shadow);" : "opacity:.55;"}`;
+  const card = stepCard(
+    `<div style="width:100%;font-size:.82rem">` +
+       `<code>${esc(ML.name)}</code> &middot; ` +
+       (trained ? (validated ? "trained and validated" : "trained, not validated yet")
+                : "<b>not trained yet</b>") +
+       (ML.table ? ` &middot; from <code>${esc(ML.table)}</code>` : "") +
+     `</div>
+     <div class="wrow" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+       <button class="m_xtrain" style="${bstyle(!trained, true)}">${trained ? "Train again" : "Train"}</button>
+       <button class="m_xval" ${trained ? "" : "disabled"} style="${bstyle(trained, trained)}">${validated ? "Validate again" : "Validate"}</button>
+       <button class="m_xtest" ${trained ? "" : "disabled"} style="${bstyle(false, trained)}">Test predictions</button>
+     </div>`,
+    null);
+  card.querySelector(".m_xtrain").onclick = e => { e.preventDefault(); mlStepTrain(m); };
+  card.querySelector(".m_xval").onclick = e => { e.preventDefault(); if (trained) mlStepValidate(); };
+  card.querySelector(".m_xtest").onclick = e => { e.preventDefault(); if (trained) mlStepPredict(); };
 }
 
 // Step 1 - CREATE MODEL.
@@ -4578,6 +4634,12 @@ async function mlStepTrain(existing) {
             } else if (s.status === "failed") {
               state[name] = "failed" + (s.error ? ": " + s.error : "");
               done = true;
+            } else if (s.status.indexOf("terminated") >= 0) {
+              // a killed run is terminal, and IRIS leaves no STATUS_CODE behind
+              // for it - polling on for another 20 minutes only hides that the
+              // run is already over. Status() supplies the explanation.
+              state[name] = s.status + (s.error ? ": " + s.error : "");
+              done = true;
             } else if (s.status === "none") {
               // the run row appears a moment after the job starts; if it never
               // shows up the job never ran, and polling for 20 minutes hides that
@@ -4639,7 +4701,7 @@ async function mlStepValidate() {
       ML.name = name;
       const j = await mlPost("validate", { name, table });
       await mlDrawGraph(name);
-      mlShowMetrics(j.metrics || []);
+      mlShowMetrics(j.metrics || [], j.excluded || 0);
       mlStepPredict();
     });
 }
@@ -4647,13 +4709,21 @@ async function mlStepValidate() {
 // Only the overall figures. Validation also returns one row per class (a
 // TARGET_VALUE on the metric); those are dropped here deliberately - they turn
 // a four-line summary into a wall of numbers on a many-class target.
-function mlShowMetrics(metrics) {
+function mlShowMetrics(metrics, excluded) {
   const overall = metrics.filter(m => !m.class);
   if (!overall.length) { wrecap("Validation produced no metrics."); return; }
+  // Say when the metrics cover fewer rows than the table holds. Rows with no
+  // target value cannot be scored and are dropped before validating; without
+  // this line the figures cannot be reconciled against the table.
+  const note = excluded
+    ? `<div style="font-size:.74rem;color:var(--ink-soft);margin-top:.3rem">` +
+      `${excluded.toLocaleString()} row(s) with no target value were excluded &mdash; ` +
+      `they cannot be scored.</div>`
+    : "";
   wmsg("wrecap", `<b>Metrics.</b><table style="width:100%;border-collapse:collapse;font-size:.82rem">` +
     overall.map(m => `<tr><td style="padding:.15rem 0">${esc(m.metric)}</td>` +
       `<td style="text-align:right"><b>${esc(m.value)}</b></td></tr>`).join("") +
-    `</table>`);
+    `</table>` + note);
 }
 
 // Step 4 - PREDICT / PROBABILITY preview.
@@ -4685,18 +4755,24 @@ async function mlStepPredict() {
         forClass: c.querySelector(".m_pclass").value.trim(),
         maxRows: +c.querySelector(".m_prows").value || 10
       });
-      const cols = j.columns || [], rows = j.rows || [];
+      const rows = j.rows || [];
       // show the statement that produced the grid, so the step explains itself
       const sql = j.sql
         ? `<div style="font-family:ui-monospace,Consolas,monospace;font-size:.72rem;` +
           `background:var(--wash-1);border:1px solid var(--rule);border-radius:8px;` +
           `padding:.4rem .55rem;margin:.3rem 0;overflow:auto">${esc(j.sql)}</div>`
         : "";
-      wmsg("wrecap", `<b>${rows.length} row(s)</b> &mdash; computed by this query:` + sql +
-        `<div style="overflow:auto"><table style="border-collapse:collapse;font-size:.78rem">` +
-        `<tr>${cols.map(h => `<th style="text-align:left;padding:.15rem .5rem .15rem 0">${esc(h)}</th>`).join("")}</tr>` +
-        rows.map(r => `<tr>${r.map(v => `<td style="padding:.15rem .5rem .15rem 0">${esc(v)}</td>`).join("")}</tr>`).join("") +
-        `</table></div>`);
+      // Same grid the transform step draws: renderPreviewTable() handles the
+      // styling, the humanised headers and the number formatting, and redraws
+      // itself when the audience view changes. Hand-rolling a <table> here meant
+      // the last step of the ML flow was the one place showing raw text columns.
+      const box = wmsg("wrecap", `<b>${rows.length} row(s)</b> &mdash; computed by this query:` +
+        sql + `<div class="m_pgrid" style="width:100%"></div>`);
+      // only the shape the grid needs: renderPreviewTable stashes what it is
+      // given on the element to redraw on a view switch, and j also carries the
+      // same rows again positionally (columns/rows) plus the SQL.
+      renderPreviewTable(box.querySelector(".m_pgrid"),
+        { columnDefs: j.columnDefs || "", sample: j.sample || { rows: [] } });
       offerMlMore();
     });
 }
@@ -4824,7 +4900,12 @@ function offerMlMore() {
 // flowchart, and transform-deploy derives the staging/target table names and
 // the production host names from it. So it must be a legal SQL identifier.
 function sqlSafeName(raw) {
-  return String(raw || "").trim().replace(/[^A-Za-z0-9_]/g, "_").replace(/^_+|_+$/g, "");
+  const out = String(raw || "").trim().replace(/[^A-Za-z0-9_]/g, "_").replace(/^_+|_+$/g, "");
+  // An SQL identifier cannot start with a digit, so a file like
+  // "2INMETSAOPAULO2025.CSV" yielded the base name "2INMETSAOPAULO2025" and the
+  // server rejected the deploy with a bare "invalid baseName". Prefix it the
+  // way SafeColumnName() does on the ObjectScript side.
+  return /^[0-9]/.test(out) ? "t_" + out : out;
 }
 function defaultEtlName() {
   const d = new Date();
@@ -4987,7 +5068,12 @@ function mcpStepTools() {
 
   const body = MCP.specs.map((t, i) => mcpToolHtml(t, i)).join("");
   const card = stepCard(
-    `<div style="width:100%;display:flex;flex-direction:column;gap:.55rem">${body}</div>`,
+    `<div class="mcp_list" style="width:100%;display:flex;flex-direction:column;gap:.55rem">${body}</div>
+     <div class="wrow" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+       <button class="mcp_add" style="${MCPBTN}">+ Add custom tool</button>
+       <span class="w_details">a question the proposed tools do not answer &mdash;
+         write the SELECT yourself</span>
+     </div>`,
     `Publish ${MCP.specs.length} tool${MCP.specs.length === 1 ? "" : "s"}`,
     async c => {
       mcpHarvest(c);
@@ -5009,7 +5095,7 @@ function mcpStepTools() {
   // Test buttons act on the CURRENT textarea contents, not on what was
   // proposed: editing the SQL and then testing the old version would be a
   // convincing lie.
-  card.querySelectorAll(".mcp_test").forEach(b => {
+  const wireTest = b => {
     b.onclick = async e => {
       e.preventDefault();
       const i = +b.dataset.i;
@@ -5026,7 +5112,42 @@ function mcpStepTools() {
         out.innerHTML = "";   // wfail already drew the reason as a card
       }
     };
-  });
+  };
+  card.querySelectorAll(".mcp_test").forEach(wireTest);
+
+  // A tool the proposer did not think of. The proposed set covers sample rows,
+  // schema and grouped totals; anything else - a filter, a join, a ratio - had
+  // to be got by editing one of those into something it was not, which loses
+  // the tool it was. This appends a blank one instead, edited and tested
+  // through exactly the same fields, and published in the same batch.
+  const addBtn = card.querySelector(".mcp_add");
+  if (addBtn) addBtn.onclick = e => {
+    e.preventDefault();
+    mcpHarvest(card);        // keep whatever is already typed on screen
+    const last = MCP.specs[MCP.specs.length - 1];
+    const table = (last && last.table) || ((MCP.tables || [])[0] || {}).full || "";
+    // a default name that does not collide with one already in the list
+    const taken = MCP.specs.map(t => (t.name || "").toLowerCase());
+    let n = 1, name = "custom_tool_1";
+    while (taken.indexOf(name) >= 0) { n++; name = "custom_tool_" + n; }
+    const i = MCP.specs.length;
+    MCP.specs.push({ name, table, custom: 1, description: "",
+                     sql: table ? `SELECT TOP 100 * FROM ${table}` : "", arguments: "", maxRows: 200 });
+    card.querySelector(".mcp_list").insertAdjacentHTML("beforeend", mcpToolHtml(MCP.specs[i], i));
+    wireTest(card.querySelector(`.mcp_test[data-i="${i}"]`));
+    mcpSyncPublishLabel(card);
+    // the description is the one field with no sensible default, and the one
+    // the assistant actually reads - so start there
+    const desc = card.querySelector(`.mcp_desc[data-i="${i}"]`);
+    if (desc) { desc.placeholder = "what question does this answer? the assistant reads this to decide when to call it"; desc.focus(); }
+  };
+}
+
+/* The publish button counts the tools, so it goes stale the moment one is
+   added. */
+function mcpSyncPublishLabel(card) {
+  const btn = card.querySelector(".wsave");
+  if (btn) btn.textContent = `Publish ${MCP.specs.length} tool${MCP.specs.length === 1 ? "" : "s"}`;
 }
 
 function mcpToolHtml(t, i) {
@@ -5037,7 +5158,11 @@ function mcpToolHtml(t, i) {
       <input type="checkbox" class="mcp_keep" data-i="${i}" checked>
       <input class="mcp_name" data-i="${i}" value="${escA(t.name)}" size="28"
              style="font-weight:700;font-size:.8rem">
-      <span class="w_details">${esc(t.table || "")}</span>
+      ${t.custom
+        ? `<select class="mcp_table w_details" data-i="${i}">${
+            (MCP.tables || []).map(x => `<option value="${escA(x.full)}" ${x.full === t.table ? "selected" : ""}>${esc(x.full)}</option>`).join("")
+          }</select>`
+        : `<span class="w_details">${esc(t.table || "")}</span>`}
     </label>
     <div style="margin-top:.4rem"><span class="w_details">description &mdash; what the assistant reads</span>
       <textarea class="mcp_desc" data-i="${i}" rows="2" style="${ta}">${esc(t.description)}</textarea></div>
@@ -5060,7 +5185,8 @@ function mcpHarvest(card) {
   MCP.specs.forEach((t, i) => {
     const q = s => card.querySelector(`${s}[data-i="${i}"]`);
     const name = q(".mcp_name"), desc = q(".mcp_desc"), sql = q(".mcp_sql");
-    const args = q(".mcp_args"), max = q(".mcp_max");
+    const args = q(".mcp_args"), max = q(".mcp_max"), tbl = q(".mcp_table");
+    if (tbl) t.table = tbl.value;
     if (name) t.name = name.value.trim();
     if (desc) t.description = desc.value.trim();
     if (sql) t.sql = sql.value.trim();

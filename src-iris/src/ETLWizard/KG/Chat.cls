@@ -51,6 +51,10 @@ Parameter MAXFACTS = 20;
 /// Set it back with SetChatMode("agent") to get the %AI.Agent path again.
 Parameter CHATMODEDEFAULT = "direct";
 
+/// How long to wait for the streaming endpoint's response headers. This is the
+/// model-load wait (see AnswerStream), not a network round trip.
+Parameter HEADERWAIT = 240;
+
 ClassMethod GetChatMode() As %String
 {
     Set mode = $Get(^ETLWizard.Agent("kgchat", "mode"))
@@ -338,9 +342,16 @@ ClassMethod Answer(prompt As %String, askId As %String, Output err As %String) A
         Set req.Server = $Piece($Piece(baseUrl, "://", 2), ":", 1)
         Set req.Port = +$Piece($Piece(baseUrl, "://", 2), ":", 2)
         Set req.Https = ($Piece(baseUrl, "://", 1) = "https")
-        Set req.ContentType = "application/json"
+        // UTF-8 on both legs, for the same reason AnswerStream() does it: the
+        // entity body is a BINARY stream, so an accented prompt written as
+        // characters goes out as single bytes that are not valid UTF-8, and
+        // Ollama substitutes U+FFFD for each one - the record comes back quoted
+        // with its accents replaced by question marks. ContentCharset is left
+        // alone deliberately: the bytes are already encoded here, and setting it
+        // would encode them a second time.
+        Set req.ContentType = "application/json; charset=utf-8"
         Set req.Timeout = 300
-        Do req.EntityBody.Write(body.%ToJSON())
+        Do req.EntityBody.Write($ZConvert(body.%ToJSON(), "O", "UTF8"))
 
         Set sc = req.Post("/v1/chat/completions")
         If $$$ISERR(sc) {
@@ -352,7 +363,14 @@ ClassMethod Answer(prompt As %String, askId As %String, Output err As %String) A
                 " - is the model '" _ model _ "' pulled in Ollama?"
             Return ""
         }
-        Set json = ##class(%DynamicAbstractObject).%FromJSON(req.HttpResponse.Data)
+        // Ollama answers "Content-Type: application/json" with no charset, so
+        // %Net hands back undecoded bytes; decode them before parsing or every
+        // multi-byte character arrives as one character per byte.
+        Set raw = ""
+        While 'req.HttpResponse.Data.AtEnd {
+            Set raw = raw _ req.HttpResponse.Data.Read(32000)
+        }
+        Set json = ##class(%DynamicAbstractObject).%FromJSON($ZConvert(raw, "I", "UTF8"))
         Set choices = json.%Get("choices")
         If '$IsObject(choices) || (choices.%Size() = 0) {
             Set err = "the chat model returned no choices"
@@ -422,12 +440,18 @@ ClassMethod AnswerStream(prompt As %String, askId As %String, cfg As %DynamicObj
         If effort '= "" {
             Do body.%Set("reasoning_effort", effort)
         }
-        Set json = body.%ToJSON()
+        // JSON is UTF-8 by definition, and this socket carries BYTES - it is
+        // opened with no translation, so whatever is written goes out as it
+        // stands. Encoding here (rather than relying on the device) keeps
+        // Content-Length honest: it must count bytes, and $Length() counts
+        // CHARACTERS, so an accented prompt would under-declare its own body
+        // and the request would be truncated at the far end.
+        Set json = $ZConvert(body.%ToJSON(), "O", "UTF8")
 
         Set crlf = $Char(13, 10)
         Set req = "POST /v1/chat/completions HTTP/1.1" _ crlf _
             "Host: " _ host _ ":" _ port _ crlf _
-            "Content-Type: application/json" _ crlf _
+            "Content-Type: application/json; charset=utf-8" _ crlf _
             "Accept: text/event-stream" _ crlf _
             "Content-Length: " _ $Length(json) _ crlf _
             "Connection: close" _ crlf _ crlf _ json
@@ -446,11 +470,26 @@ ClassMethod AnswerStream(prompt As %String, askId As %String, cfg As %DynamicObj
         Write req, *-3
 
         // Headers, up to the blank line that ends them.
+        //
+        // The header wait is the MODEL LOAD wait, not a network wait: Ollama
+        // sends nothing until the model is resident, and a cold 9.6 GB model
+        // with layers spilling to CPU takes ~33 s to first byte on this box.
+        // At the 30 s this used to be, the first question after any restart
+        // failed with "the chat model did not respond" while the load was
+        // seconds from finishing - and the load then completed, so the NEXT
+        // question worked and the failure looked random. #HEADERWAIT is
+        // deliberately near the buffered path's own 300 s timeout; a model that
+        // is genuinely absent fails fast on the Open above instead.
+        // "answering" is the status Run() already set; only the detail changes,
+        // which is what the UI shows in the live bubble. A NEW status value
+        // would not be one Poll() counts as done and would be dead weight.
+        Do ..Mark(askId, "answering", "waiting for the chat model (a cold model takes up to a minute to load)")
         Set lines = 0
         For {
-            Read line:30
+            Read line:..#HEADERWAIT
             If '$Test {
-                Set err = "the chat model did not respond"
+                Set err = "the chat model did not send a reply within " _ ..#HEADERWAIT _
+                    "s - it may still be loading; ask again in a moment"
                 Quit
             }
             Set line = $ZStrip(line, "*", $Char(13))
@@ -488,11 +527,18 @@ ClassMethod AnswerStream(prompt As %String, askId As %String, cfg As %DynamicObj
             }
             Set ev = ""
             Try {
-                Set ev = ##class(%DynamicObject).%FromJSON(payload)
+                // Decode UTF-8 -> characters BEFORE parsing. Without this every
+                // byte of a multi-byte character became a character of its own
+                // and "comunicacao" (with a cedilla and a tilde) was stored, and
+                // shown, as "comunicaAAo" with the bytes spelled out. The
+                // buffered Answer() path never had this because %Net.HttpRequest
+                // decodes the response for it; this socket does not.
+                Set ev = ##class(%DynamicObject).%FromJSON($ZConvert(payload, "I", "UTF8"))
             } Catch {
-                // a chunk boundary split the JSON: the piece is unusable on its
-                // own and the next delta carries on, so drop it rather than
-                // guess at the text it contained
+                // a chunk boundary split the JSON - or, now, split a character
+                // mid-sequence: the piece is unusable on its own and the next
+                // delta carries on, so drop it rather than guess at the text it
+                // contained
                 Continue
             }
             Set choices = ev.%Get("choices")

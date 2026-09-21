@@ -775,10 +775,14 @@ ClassMethod MLValidate() As %Status
         If (name = "") || (table = "") {
             Return ..WriteError("name and table are required", "400 Bad Request")
         }
-        If '##class(ETLWizard.Tools.MLModel).Validate(name, table, .error) {
+        If '##class(ETLWizard.Tools.MLModel).Validate(name, table, .error, .excluded) {
             Return ..WriteError(error)
         }
-        Return ..WriteJSON({"ok": 1, "metrics": (##class(ETLWizard.Tools.MLModel).Metrics(name))})
+        // excluded rows are worth saying out loud: the metrics are computed over
+        // fewer rows than the table holds, and silently scoring a smaller set is
+        // exactly the kind of thing that makes a number impossible to reconcile
+        Return ..WriteJSON({"ok": 1, "excluded": (+$Get(excluded)),
+                            "metrics": (##class(ETLWizard.Tools.MLModel).Metrics(name))})
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }

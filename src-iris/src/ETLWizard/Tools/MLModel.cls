@@ -170,15 +170,29 @@ ClassMethod UsingClause(settings As %DynamicObject) As %String
     If '$IsObject(settings) {
         Return ""
     }
-    Set it = settings.%GetIterator(), any = 0
+    // Every value that reaches here is a string: the frontend's form inputs are
+    // strings, and DefinitionSettings() parses DEFAULT_SETTINGS out of a text
+    // column. %ToJSON() then quotes them, so AutoML received {"forward": "24"}
+    // and its Python compared a str to an int:
+    //   TypeError: '>' not supported between instances of 'str' and 'int'
+    // Re-emit anything that is canonically a number as a JSON number. The test
+    // is on the value, not the key, so "1H" for frequency and "time" for
+    // trainmode still go out quoted, and a value like "007" stays a string
+    // rather than being silently renumbered to 7.
+    Set out = {}, any = 0
+    Set it = settings.%GetIterator()
     While it.%GetNext(.k, .v) {
         Set any = 1
-        Quit
+        If (v '= ""), $IsValidNum(v), (v = +v) {
+            Do out.%Set(k, +v, "number")
+        } Else {
+            Do out.%Set(k, v)
+        }
     }
     If 'any {
         Return ""
     }
-    Return " USING " _ settings.%ToJSON()
+    Return " USING " _ out.%ToJSON()
 }
 
 /// CREATE MODEL / CREATE TIME SERIES MODEL.
@@ -282,6 +296,32 @@ ClassMethod DefinitionSettings(name As %String) As %DynamicObject
     Return out
 }
 
+/// %ML builds its pandas dataframe by formatting values through $FNUMBER, which
+/// honours the process's NLS DecimalSeparator. This instance runs a Portuguese
+/// locale, where that separator is a comma, so 18.8 is handed to Python as
+/// "18,8000" and the dataframe build dies with
+///   ValueError: could not convert string to float: '18,8000'
+/// (wrapped as "ERROR #2802: %ML cannot create dataframe").
+///
+/// Python's float() only ever accepts a dot, so a comma separator can never be
+/// right on this path. Force a dot around any call that builds a dataframe and
+/// put the process's own separator back afterwards - the setting is
+/// process-scoped, and a web process serves other requests after this one.
+/// Returns the previous separator so the caller can restore it.
+ClassMethod DecimalPoint(sep As %String = ".") As %String [ Internal ]
+{
+    Set old = ""
+    Try {
+        Set fmt = ##class(%SYS.NLS.Format).%New("current")
+        Set old = fmt.DecimalSeparator
+        If (sep '= ""), (sep '= old) {
+            Set fmt.DecimalSeparator = sep
+        }
+    } Catch ex {
+    }
+    Return old
+}
+
 /// Kick off training in a background job and return at once.
 ///
 /// Training routinely outlives the Web Gateway's response timeout, and a
@@ -328,6 +368,7 @@ ClassMethod TrainAsync(name As %String, table As %String = "", using As %Dynamic
 /// from a JOB, so they are left for Status() to read out of ML_TRAINING_RUNS.
 ClassMethod TrainJob(name As %String, table As %String = "", usingClause As %String = "")
 {
+    Set prev = ..DecimalPoint()
     Try {
         Set sql = "TRAIN MODEL " _ name
         If table '= "" {
@@ -336,6 +377,7 @@ ClassMethod TrainJob(name As %String, table As %String = "", usingClause As %Str
         Do ##class(%SQL.Statement).%ExecDirect(, sql _ usingClause)
     } Catch ex {
     }
+    Do ..DecimalPoint(prev)
     Quit
 }
 
@@ -388,6 +430,17 @@ ClassMethod Status(name As %String) As %DynamicObject
                 If (out.status = "failed"), code '= "" {
                     Set out.error = ..Explain(code, ..CleanStatus(code))
                 }
+                // "canceled/terminated" is not a failure IRIS can describe: the
+                // training process was killed, so it never wrote a STATUS_CODE
+                // and never wrote a TRAINING_DURATION. Before this arm the tab
+                // showed the bare status with an empty error and there was
+                // nothing on screen to act on. The cause is practically always
+                // the AutoTS ensemble exhausting the host's memory on a long
+                // series - it peaks near 9.5 GB at ~88k hourly rows, and grows
+                // faster than linearly from there - so say that.
+                If out.status [ "terminated", out.error = "" {
+                    Set out.error = ..TerminatedHint(name)
+                }
             }
         }
         Set out.trainedModel = ..TrainedName(name)
@@ -396,6 +449,43 @@ ClassMethod Status(name As %String) As %DynamicObject
         Set out.error = ex.DisplayString()
     }
     Return out
+}
+
+/// What to tell a user whose training process was killed. Names the row count
+/// when the definition's training table can be read, because the row count is
+/// the knob that matters: the fix is a shorter or coarser series, not a
+/// different setting.
+ClassMethod TerminatedHint(name As %String) As %String [ Internal ]
+{
+    Set rows = ""
+    Try {
+        Set stmt = ##class(%SQL.Statement).%New()
+        Set sc = stmt.%Prepare("SELECT DEFAULT_TRAINING_QUERY FROM INFORMATION_SCHEMA.ML_MODELS WHERE MODEL_NAME = ?")
+        If $$$ISOK(sc) {
+            Set rs = stmt.%Execute(name)
+            If rs.%Next() {
+                // "SELECT * FROM  ETLWIZARD . ext_x" - IRIS pads the dots
+                Set query = rs.%GetData(1)
+                Set table = $ZStrip($Piece(query, " FROM ", 2), "<>W")
+                If table '= "" {
+                    Set table = $Replace($Replace(table, " . ", "."), " ", "")
+                    Set cnt = ##class(%SQL.Statement).%ExecDirect(, "SELECT COUNT(*) FROM " _ table)
+                    If cnt.%Next() {
+                        Set rows = cnt.%GetData(1)
+                    }
+                }
+            }
+        }
+    } Catch ex {
+    }
+    Set hint = "the training process was killed before it could report anything"
+    If rows '= "" {
+        Set hint = hint _ " - " _ rows _ " rows"
+    }
+    Return hint _ ". This is almost always the AutoTS ensemble running the host "_
+           "out of memory: it needs roughly 9.5 GB at 88,000 hourly rows and more "_
+           "than linearly beyond that. Train on a shorter window, or aggregate to "_
+           "one row per day instead of per hour."
 }
 
 ClassMethod TrainedName(name As %String) As %String
@@ -432,20 +522,80 @@ ClassMethod ModelInfo(name As %String) As %String
     Return ""
 }
 
-ClassMethod Validate(name As %String, table As %String, Output error As %String) As %Boolean
+ClassMethod Validate(name As %String, table As %String, Output error As %String, Output excluded As %Integer) As %Boolean
 {
-    Set error = ""
+    Set error = "", excluded = 0
+    Set prev = ..DecimalPoint()
     Try {
-        Set rs = ##class(%SQL.Statement).%ExecDirect(, "VALIDATE MODEL " _ name _ " FROM " _ table)
+        Set source = ..ScorableSource(name, table, .excluded)
+        Set rs = ##class(%SQL.Statement).%ExecDirect(, "VALIDATE MODEL " _ name _ " FROM " _ source)
         If rs.%SQLCODE < 0 {
             Set error = ..Explain(rs.%SQLCODE, rs.%Message)
+            Do ..DecimalPoint(prev)
             Return 0
         }
     } Catch ex {
         Set error = ex.DisplayString()
+        Do ..DecimalPoint(prev)
         Return 0
     }
+    Do ..DecimalPoint(prev)
     Return 1
+}
+
+/// The validation set with unlabelled rows removed, plus how many that was.
+///
+/// %ML.TrainedModel:%ValidateRegression() takes the target mean with AVG(),
+/// which skips NULL, but then reads each row with %Get(), where a NULL comes
+/// back as "" and arithmetic treats it as 0. Every unlabelled row therefore
+/// contributes (0 - mean)^2 to BOTH the error sum and the variance sum. On
+/// ext_t_2INMETSAOPAULO2024_clean, 984 of 8,784 rows (11%) have no temperature
+/// reading, and the reported metrics came out
+///     MSE 46.07  RMSE 6.79  Variance 66.92  R2 0.31
+/// against a true
+///     MSE  0.15  RMSE 0.39  Variance 22.96  R2 0.99
+/// - the model looked barely predictive when it was near-exact. The giveaway is
+/// Variance: 66.92 against a column whose actual variance is 22.96.
+///
+/// A row with no label cannot be scored, so dropping it is right for any model
+/// type, not just a workaround for this arithmetic. %ML lives in IRISLIB, which
+/// is mounted read-only, so the filter has to go here.
+///
+/// Falls back to the bare table when the predicting column cannot be read, so a
+/// lookup failure costs the filter rather than the validation.
+ClassMethod ScorableSource(name As %String, table As %String, Output excluded As %Integer) As %String
+{
+    Set excluded = 0
+    Try {
+        Set stmt = ##class(%SQL.Statement).%New()
+        Set sc = stmt.%Prepare("SELECT PREDICTING_COLUMN_NAME FROM INFORMATION_SCHEMA.ML_MODELS WHERE MODEL_NAME = ?")
+        If $$$ISERR(sc) {
+            Return table
+        }
+        Set rs = stmt.%Execute(name)
+        If 'rs.%Next() {
+            Return table
+        }
+        // IRIS stores this qualified on some models; %ValidateRegression strips
+        // it the same way before use
+        Set target = rs.%GetData(1)
+        Set:(target [ ".") target = $Piece(target, ".", 2)
+        If '##class(ETLWizard.Tools.Util).ValidIdent(target) {
+            Return table
+        }
+        Set cnt = ##class(%SQL.Statement).%ExecDirect(,
+            "SELECT COUNT(*) FROM " _ table _ " WHERE " _ target _ " IS NULL")
+        If cnt.%Next() {
+            Set excluded = +cnt.%GetData(1)
+        }
+        If excluded = 0 {
+            Return table
+        }
+        Return "(SELECT * FROM " _ table _ " WHERE " _ target _ " IS NOT NULL)"
+    } Catch ex {
+        Set excluded = 0
+    }
+    Return table
 }
 
 /// Validation metrics of the most recent run. TARGET_VALUE is the class a
@@ -455,11 +605,19 @@ ClassMethod Metrics(name As %String) As %DynamicArray
     Set out = []
     Try {
         Set stmt = ##class(%SQL.Statement).%New()
+        // Scope to the LATEST validation run. ML_VALIDATION_METRICS keeps every
+        // run's rows for the life of the model, so selecting on MODEL_NAME alone
+        // returned one MSE per run ever made - validate a model twice and the
+        // tab showed MSE, R2, RMSE and Variance two and three times over, with
+        // no way to tell which figure was current.
         Set sc = stmt.%Prepare("SELECT METRIC_NAME, METRIC_VALUE, TARGET_VALUE "_
                                  "FROM INFORMATION_SCHEMA.ML_VALIDATION_METRICS "_
-                                 "WHERE MODEL_NAME = ? ORDER BY TARGET_VALUE, METRIC_NAME")
+                                 "WHERE MODEL_NAME = ? AND VALIDATION_RUN_NAME = "_
+                                 "(SELECT TOP 1 VALIDATION_RUN_NAME FROM INFORMATION_SCHEMA.ML_VALIDATION_RUNS "_
+                                 "WHERE MODEL_NAME = ? ORDER BY START_TIMESTAMP DESC) "_
+                                 "ORDER BY TARGET_VALUE, METRIC_NAME")
         If $$$ISOK(sc) {
-            Set rs = stmt.%Execute(name)
+            Set rs = stmt.%Execute(name, name)
             While rs.%Next() {
                 Do out.%Push({"metric": (rs.%GetData(1)), "value": (rs.%GetData(2)), "class": (rs.%GetData(3))})
             }
@@ -474,7 +632,8 @@ ClassMethod Metrics(name As %String) As %DynamicArray
 ClassMethod Predict(name As %String, table As %String, forClass As %String = "", maxRows As %Integer = 10, Output error As %String) As %DynamicObject
 {
     Set error = ""
-    Set out = {"columns": [], "rows": [], "sql": ""}
+    Set out = {"columns": [], "rows": [], "sql": "", "columnDefs": "", "sample": {"rows": []}}
+    Set prev = ..DecimalPoint()
     Try {
         Set sel = "SELECT TOP " _ (+maxRows) _ " *, PREDICT(" _ name _ ") AS ml_prediction"
         If forClass '= "" {
@@ -484,25 +643,64 @@ ClassMethod Predict(name As %String, table As %String, forClass As %String = "",
         // hand the statement back so the step can show exactly what produced
         // the rows - and so a failure is debuggable from the UI
         Set out.sql = sel
-        Set rs = ##class(%SQL.Statement).%ExecDirect(, sel)
+        // %SelectMode 1 (ODBC), not the default 0 (logical) - the same reason
+        // Util.RunSelect() sets it. In logical mode a %TimeStamp column reaches
+        // the screen as 1154594035806846976, so the one column that says WHEN a
+        // prediction applies was unreadable in this grid.
+        Set stmt = ##class(%SQL.Statement).%New()
+        Set stmt.%SelectMode = 1
+        Set sc = stmt.%Prepare(sel)
+        If $$$ISERR(sc) {
+            Set error = $System.Status.GetErrorText(sc)
+            Do ..DecimalPoint(prev)
+            Return out
+        }
+        Set rs = stmt.%Execute()
         If rs.%SQLCODE < 0 {
             Set error = ..Explain(rs.%SQLCODE, rs.%Message)
+            Do ..DecimalPoint(prev)
             Return out
         }
         Set meta = rs.%GetMetadata()
+        // Two shapes of the same grid. columns/rows (names + positional arrays)
+        // is what this has always returned. columnDefs/sample is the shape the
+        // transform preview uses, which lets the predictions render through
+        // renderPreviewTable() - the same styled, number-formatted table the
+        // rest of the wizard shows - instead of a bare text grid.
+        Set defs = ""
+        Set names = ""
         For i = 1:1:meta.columnCount {
-            Do out.columns.%Push(meta.columns.GetAt(i).colName)
+            Set col = meta.columns.GetAt(i)
+            // SELECT *, PREDICT(...) can repeat a name when the table already
+            // has an ml_prediction column. Object-keyed rows would lose one, so
+            // make the duplicate distinct before it is used as a key.
+            Set nm = col.colName
+            If $ListFind($ListFromString(names, ","), nm) > 0 {
+                Set nm = nm _ "_" _ i
+            }
+            Set names = names _ $Select(names = "": "", 1: ",") _ nm
+            Do out.columns.%Push(nm)
+            Set defs = defs _ $Select(defs = "": "", 1: ", ") _ nm _ " " _
+                ##class(ETLWizard.Tools.Util).ODBCToDDL(col.ODBCType, col.precision, col.scale)
         }
+        Set out.columnDefs = defs
+        Set objRows = []
         While rs.%Next() {
             Set row = []
+            Set obj = {}
             For i = 1:1:meta.columnCount {
-                Do row.%Push(rs.%GetData(i))
+                Set v = rs.%GetData(i)
+                Do row.%Push(v)
+                Do obj.%Set($Piece(names, ",", i), v)
             }
             Do out.rows.%Push(row)
+            Do objRows.%Push(obj)
         }
+        Set out.sample = {"rows": (objRows)}
     } Catch ex {
         Set error = ex.DisplayString()
     }
+    Do ..DecimalPoint(prev)
     Return out
 }
 
@@ -648,9 +846,17 @@ ClassMethod NormalKind(kind As %String) As %String
 
 /// The USING key that points AutoML at a model directory depends on the problem
 /// type: classifiers and regressors are loaded from separate paths.
+///
+/// The key is "pathtoregressors", NOT "path_to_regressors". %ML.AutoML.Provider
+/// reads trainingrun.Settings.pathtoregressors and only then passes it on to
+/// automl.py as path_to_regressors - the underscored spelling is the Python
+/// argument, not the SQL setting. An unknown USING key is accepted silently, so
+/// with the underscored one every custom model was simply ignored and AutoML
+/// ran the shipped candidates instead; measured here, a model pinned this way
+/// still trained as "Linear Regression".
 ClassMethod PathKey(kind As %String) As %String
 {
-    Return $Select(..NormalKind(kind) = "regression": "path_to_regressors", 1: "path_to_classifiers")
+    Return $Select(..NormalKind(kind) = "regression": "pathtoregressors", 1: "pathtoclassifiers")
 }
 
 /// The USING settings that select one custom model, ready to merge into a
@@ -916,11 +1122,22 @@ ClassMethod Explain(code As %String, message As %String) As %String
                "one row per period. Several rows sharing a timestamp, or an integer column, "_
                "both make the inferred interval zero."
     }
-    If message [ "%ValidateTimeseries" {
-        Return "time-series validation is not working on this IRIS build - "_
-               "%ML.TrainedModel:%ValidateTimeseries() fails to produce predictions "_
-               "whatever the row count or Forward horizon. Skip validation and use "_
-               "the prediction preview instead."
+    // Both of these come out of %ML.Model.1, the GENERATED routine behind
+    // PREDICT and SELECT WITH PREDICTIONS, and both are specific to time-series
+    // models - a regression or classification model predicts normally on this
+    // same build. %ValidateTimeseries drives SELECT WITH PREDICTIONS, so it
+    // inherits the failure and then misreports it as a row-count problem
+    // ("likely not enough rows ... with a Forward value of N") whatever the row
+    // count actually is. %ML.Model.1 lives in IRISLIB, which is mounted
+    // read-only, so this cannot be patched from here.
+    If (message [ "%ValidateTimeseries") || (message [ "mtorder") ||
+       (message [ "%PredictAll^%ML.Model") {
+        Return "time-series predictions are broken in this IRIS build "_
+               "(2026.3.0AI Build 136U): PREDICT() on a time-series model dies with "_
+               "<UNDEFINED> *mtorder and SELECT WITH PREDICTIONS with <PARAMETER>, "_
+               "both inside the read-only %ML.Model.1. VALIDATE MODEL is built on the "_
+               "second one, so it cannot succeed here - its own 'not enough rows' "_
+               "wording is a red herring. Non-time-series models are unaffected."
     }
     If message [ "is not unique" {
         Return "a model with that name already exists - pick another name, or drop it first."

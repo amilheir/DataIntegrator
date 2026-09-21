@@ -12,3 +12,4 @@ node_modules/
 # ever dropped back in (IMPROVEMENTS_SPEC SG-2).
 *.key
 mds/
+src-iris/dropzone/

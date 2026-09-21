@@ -503,12 +503,23 @@ ClassMethod ODBCToDDL(odbc As %Integer, precision As %Integer, scale As %Integer
         Return "BIGINT"
     }
     // decimal / numeric -> fixed generous precision so aggregate decimals survive
+    //
+    // Scale is CAPPED at 6, not merely defaulted to it. Precision is fixed at
+    // 19, so every decimal place costs an integer digit: an expression whose
+    // reported scale is 17 - which is what IRIS reports for a division or an
+    // AVG() - would yield NUMERIC(19,17), leaving two integer digits. A value
+    // of 33333.38866666666667 then fails the staging insert with SQLCODE -104,
+    // at deploy time rather than at preview (preview reads columns and never
+    // builds the staging table). Capping trades rounding beyond 6 decimals for
+    // a column that accepts the magnitudes an ETL actually produces.
+    // Two bounds meet at one value. Scale must be at least 6, or an expression
+    // that under-reports its scale (a computed column reporting 0 while
+    // producing 1.5) rounds on the way in. It must be at most 6, or the integer
+    // half of the column is too small for the magnitudes above. Precision is
+    // fixed, so 6 is the only scale that satisfies both - hence a constant
+    // rather than a clamp.
     If (odbc = 2) || (odbc = 3) {
-        Set s = +scale
-        If (s < 6) || (s > 18) {
-            Set s = 6
-        }
-        Return "NUMERIC(19," _ s _ ")"
+        Return "NUMERIC(19,6)"
     }
     // float / real / double
     If $ListFind($ListBuild(6, 7, 8), odbc) > 0 {
