@@ -33,6 +33,25 @@ services:
       - "${IRIS_SPORT}:1972"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - postgres
+    # After IRIS starts: fetch the JDBC jar if missing and, on a fresh iris-data
+    # volume, create the connection/foreign servers and mount the demo tables.
+    # Log: /opt/irisbuild/data/startup.log. The script backgrounds its work.
+    # CR is stripped for the same reason as webgateway's entrypoint below.
+    command: ["-a", "sed 's/\\r$//' /opt/irisbuild/startup.sh | bash"]
+    # Replaces the image's /irisHealth.sh, which demands system status ok/warn.
+    # Build 136 raises an hourly sev-2 WorkMgr "leaked/freed a lock" alert from
+    # %SYS.SQLSRV CleanUnfinishedConversions, which flips it to "alert" and
+    # reports a working instance unhealthy. Healthy here means IRIS is running
+    # AND startup.sh has finished, so `docker compose up --wait` returns when
+    # the app is ready to use.
+    healthcheck:
+      test: ["CMD-SHELL", "iris qlist IRIS | grep -q '\\^running' && test -f /tmp/etlwizard-ready"]
+      interval: 15s
+      timeout: 10s
+      start_period: 300s
+      retries: 3
 
   # HTTP front end: the AI Hub EAP iris-community image has no private web
   # server (WebServer=0, no CSP binaries), so REST/WS are served through the
@@ -67,11 +86,9 @@ services:
       - "${POSTGRES_PORT:-5433}:5432"
 
   # Local LLM (spec §27): starts by default alongside iris/webgateway/postgres.
-  # Models are provisioned manually (e.g. `ollama pull gemma4:e4b-it-q4_K_M`) and
-  # the profile is pointed at them via ETLWizard.Setup. Note: a raw model keeps
+  # Models are provisioned by ollama-init below. Note: a raw model keeps
   # Ollama's default num_ctx 4096, which can truncate the large architect prompt
-  # and return an empty reply — build a num_ctx-8192 Modelfile variant if you hit
-  # that on the architect (the SqlGen prompt is small and unaffected).
+  # and return an empty reply — hence the num_ctx-8192 Modelfile variants.
   ollama:
     image: "${OLLAMA_IMAGE:-ollama/ollama:0.32.14}"
     environment:
@@ -89,6 +106,24 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+
+  # One-shot: pulls the base models and builds the three picker models from the
+  # Modelfiles, plus the KG embedding model. Idempotent, exits when done. The
+  # first run downloads ~25 GB; follow it with `docker compose logs -f ollama-init`.
+  ollama-init:
+    image: "${OLLAMA_IMAGE:-ollama/ollama:0.32.14}"
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: "ollama:11434"
+    volumes:
+      - ./scripts/ollama-init.sh:/ollama-init.sh:ro
+      - ./Modelfile.gemma:/modelfiles/Modelfile.gemma:ro
+      - ./Modelfile.coder:/modelfiles/Modelfile.coder:ro
+      - ./Modelfile.ornith:/modelfiles/Modelfile.ornith:ro
+    # Same CRLF guard as webgateway: the script is a Windows bind mount.
+    entrypoint: ["/bin/sh", "-c", "sed 's/\\r$//' /ollama-init.sh | /bin/sh"]
+    restart: "no"
 
 volumes:
   ollama-models:

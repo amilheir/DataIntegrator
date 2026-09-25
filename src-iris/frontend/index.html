@@ -6,10 +6,11 @@
 <title>Data Integrator &mdash; IRIS Data Pipelines</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..900,50&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,700&display=swap" rel="stylesheet">
 <style>
 /* ============ Palette (day) — after the InterSystems editorial theme ============ */
 :root {
+  --font: "Noto Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
   --paper: #eef3f9;
   --paper-deep: #e1eaf3;
   --ink: #2f2a95;
@@ -77,7 +78,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: "Newsreader", Georgia, serif;
+  font-family: var(--font);
   background:
     radial-gradient(1200px 520px at 82% -10%, var(--wash-1), transparent 60%),
     radial-gradient(900px 620px at -10% 112%, var(--wash-2), transparent 55%),
@@ -99,26 +100,20 @@ header {
   box-shadow: 0 2px 0 rgba(17,43,77,.10);
   z-index: 6;
 }
-.masthead {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 1rem; flex-wrap: wrap; padding: .9rem 1.4rem .4rem;
-}
-.brand { display: flex; align-items: baseline; gap: .9rem; flex-wrap: wrap; }
+/* the title leads the toolbar row; the margin keeps it from reading as a control */
+.brand { display: flex; align-items: center; margin-right: 1rem; }
 h1 {
-  font-family: "Fraunces", Georgia, serif;
-  font-weight: 900; font-size: clamp(1.5rem, 3.2vw, 2.1rem);
+  font-family: var(--font);
+  font-weight: 700; font-size: clamp(1rem, 2.1vw, 1rem);
   letter-spacing: -.02em; line-height: 1;
+  text-transform: uppercase;
 }
-h1 .t-etl { color: var(--ink); }
-h1 .t-wiz { color: var(--teal-text); font-style: italic; font-weight: 800; }
-.tagline {
-  font-variant: small-caps; letter-spacing: .2em; color: var(--ink-soft);
-  font-size: .74rem;
-}
-.headerTools { display: inline-flex; align-items: center; gap: 1rem; }
+h1 .t-etl { color: var(--teal-text); }
+h1 .t-wiz { color: var(--ink); font-style: normal; font-weight: 700; }
+.headerTools { display: inline-flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-left: auto; }
 
 /* Model picker sits between the status pill and the theme toggle. The caps
-   label matches .tagline so the masthead reads as one band rather than a
+   label matches the status text so the row reads as one band rather than a
    control bolted on. */
 .modelPick { display: inline-flex; align-items: center; gap: .45rem; }
 .modelPickLabel {
@@ -131,7 +126,7 @@ h1 .t-wiz { color: var(--teal-text); font-style: italic; font-weight: 800; }
 .iconBtn {
   font-size: 1.15rem; line-height: 1; width: 2.5rem; height: 2.3rem;
   display: inline-flex; align-items: center; justify-content: center;
-  border: 1.5px solid var(--ink); border-radius: 11px; background: var(--card);
+  border: 1.5px solid var(--ink); border-radius: 8px; background: var(--card);
   color: var(--ink); cursor: pointer; box-shadow: var(--shadow);
   transition: transform .16s ease, background .18s ease, color .18s ease, box-shadow .16s ease;
 }
@@ -146,7 +141,7 @@ h1 .t-wiz { color: var(--teal-text); font-style: italic; font-weight: 800; }
      exceeds the viewport, and a clipped control is an invisible one. Wrapping
      to a second row keeps every control reachable at any window width. */
   display: flex; align-items: center; gap: .5rem .5rem; flex-wrap: wrap;
-  justify-content: flex-start; padding: .3rem 1.4rem .85rem;
+  justify-content: flex-start; padding: .8rem 1.4rem .75rem;
 }
 /* nothing inside collapses to fit; items move to the next row instead */
 .toolbar > * { flex: 0 0 auto; }
@@ -155,24 +150,25 @@ h1 .t-wiz { color: var(--teal-text); font-style: italic; font-weight: 800; }
 .tgroup { display: inline-flex; align-items: center; gap: .4rem; }
 .tsep { width: 1.5px; align-self: stretch; background: var(--rule); margin: .1rem .35rem; }
 
-/* ---- tab row: Data Sources | ETL Interop -------------------------------- */
-.tabbar { display: flex; gap: .2rem; padding: 0 1.4rem; margin-bottom: -1.5px; }
+/* ---- tab row: Data Sources | ETL Interop --------------------------------
+   Portal-style tabs ("Production | Host"): bold labels on a tinted band, the
+   active one underlined rather than drawn as a folder tab. */
+.tabbar {
+  display: flex; gap: .2rem; padding: 0 1.4rem;
+  background: var(--card-2); border-top: 1.5px solid var(--rule);
+}
 .tab {
-  font-family: "Fraunces", Georgia, serif; font-weight: 800; font-size: .92rem;
-  letter-spacing: -.01em; color: var(--ink-soft); cursor: pointer;
-  background: transparent; border: 1.5px solid transparent; border-bottom: none;
-  border-radius: 12px 12px 0 0; padding: .45rem 1.1rem;
+  font-family: var(--font); font-weight: 600; font-size: .9rem;
+  color: var(--ink-soft); cursor: pointer;
+  background: transparent; border: 0; border-bottom: 3px solid transparent;
+  border-radius: 0; padding: .5rem .85rem .4rem;
 }
 .tab:hover { color: var(--ink); }
-/* the active tab merges into the panel below it by covering the header rule */
-.tab.on {
-  color: var(--teal-text); background: var(--card);
-  border-color: var(--rule); border-bottom: 1.5px solid var(--card);
-}
+.tab.on { color: var(--ink); font-weight: 700; border-bottom-color: var(--teal-text); }
 
 input, select {
-  font-family: "Newsreader", Georgia, serif; font-size: .9rem; color: var(--ink);
-  background: var(--card); border: 1.5px solid var(--rule); border-radius: 10px;
+  font-family: var(--font); font-size: .9rem; color: var(--ink);
+  background: var(--card); border: 1.5px solid var(--rule); border-radius: 7px;
   padding: .4rem .65rem; transition: border-color .18s ease, box-shadow .18s ease;
 }
 input::placeholder { color: var(--ink-soft); font-style: italic; }
@@ -181,9 +177,9 @@ input:focus, select:focus { outline: none; border-color: var(--teal); box-shadow
 #pipeid { width: 6.5rem; }
 
 .btn {
-  font-family: "Newsreader", Georgia, serif; font-weight: 700; font-size: .78rem;
+  font-family: var(--font); font-weight: 700; font-size: .78rem;
   letter-spacing: .05em; color: var(--ink); background: var(--card);
-  border: 1.5px solid var(--ink); border-radius: 10px; padding: .44rem .95rem;
+  border: 1.5px solid var(--ink); border-radius: 7px; padding: .44rem .95rem;
   cursor: pointer; white-space: nowrap; box-shadow: var(--shadow);
   transition: transform .16s ease, background .18s ease, color .18s ease, box-shadow .16s ease;
 }
@@ -249,13 +245,13 @@ body.kgchat #right { background-color: var(--paper); }
 #kgsky .kgnode { cursor: pointer; }
 #kgsky .kgnode circle { stroke: var(--card); stroke-width: 1.5; }
 #kgsky .kglabel {
-  font-family: "Newsreader", Georgia, serif; font-size: 13px; font-weight: 600;
+  font-family: var(--font); font-size: 13px; font-weight: 600;
   fill: var(--ink); pointer-events: none; text-anchor: middle;
   paint-order: stroke; stroke: var(--paper); stroke-width: 3px; stroke-linejoin: round;
 }
 #kgsky .kglink { stroke: var(--ink-soft); stroke-opacity: .5; stroke-width: 1; }
 #kgsky .kgpred {
-  font-family: "Newsreader", Georgia, serif; font-style: italic; font-size: 11px;
+  font-family: var(--font); font-style: italic; font-size: 11px;
   fill: var(--ink-soft); pointer-events: none; text-anchor: middle;
   paint-order: stroke; stroke: var(--paper); stroke-width: 3px; stroke-linejoin: round;
 }
@@ -273,7 +269,7 @@ body.kgchat #right { background-color: var(--paper); }
   position: absolute; right: .7rem; top: .7rem; z-index: 6; width: 17rem;
   max-height: calc(100% - 1.4rem); overflow-y: auto;
   padding: .75rem .85rem; border: 1.5px solid var(--rule);
-  border-radius: 12px; background: var(--card); box-shadow: var(--shadow);
+  border-radius: 8px; background: var(--card); box-shadow: var(--shadow);
   transform: translateX(calc(100% + 1.4rem));
   transition: transform .28s cubic-bezier(.4,0,.2,1);
 }
@@ -283,7 +279,7 @@ body.kgchat #right { background-color: var(--paper); }
   font-size: 1.2rem; color: var(--ink-soft); padding: 0 0 0 .4rem;
 }
 #kginfo .kginm {
-  font-family: "Newsreader", Georgia, serif; font-weight: 700; font-size: 1.15rem;
+  font-family: var(--font); font-weight: 700; font-size: 1.15rem;
   color: var(--ink); line-height: 1.15; padding-right: 1.2rem;
 }
 #kginfo .kgity { font-size: .78rem; color: var(--ink-soft); margin: .3rem 0 .1rem; }
@@ -308,7 +304,7 @@ body.kgchat #right { background-color: var(--paper); }
   position: absolute; left: .7rem; bottom: .7rem; z-index: 5;
   max-height: 70%; overflow-y: auto;
   padding: .6rem .75rem; border: 1.5px solid var(--rule);
-  border-radius: 12px; background: var(--card); box-shadow: var(--shadow);
+  border-radius: 8px; background: var(--card); box-shadow: var(--shadow);
   /* Three quarters of full size. Scaling the whole card rather than shrinking
      each font and padding keeps every proportion - swatches, gaps, buttons -
      exactly as designed. The origin is the corner it is anchored to, so it
@@ -327,7 +323,7 @@ body.kgchat #right { background-color: var(--paper); }
 #kglegend .kglbody { display: flex; flex-direction: column; gap: .05rem; }
 .kgleg {
   display: flex; align-items: center; gap: .4rem; font-size: .78rem; color: var(--ink);
-  padding: .2rem .4rem; cursor: pointer; border-radius: 8px; user-select: none;
+  padding: .2rem .4rem; cursor: pointer; border-radius: 6px; user-select: none;
 }
 .kgleg:hover { background: var(--paper-deep, rgba(0,0,0,.05)); }
 .kgleg.sel { background: color-mix(in srgb, var(--teal, #00b2a9) 18%, transparent); font-weight: 700; }
@@ -335,7 +331,7 @@ body.kgchat #right { background-color: var(--paper); }
 .kgleg .n { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 #kglegend .kglacts { display: flex; flex-wrap: wrap; gap: .3rem .9rem; margin-top: .45rem; }
 #kglegend .kglbtn {
-  font-family: "Fraunces", serif; font-size: .7rem; font-weight: 700; letter-spacing: .05em;
+  font-family: var(--font); font-size: .7rem; font-weight: 700; letter-spacing: .05em;
   color: var(--teal, #00b2a9); background: 0; border: 0; cursor: pointer; padding: .15rem 0;
 }
 #kglegend .kglbtn:hover { text-decoration: underline; }
@@ -348,9 +344,9 @@ body.kgchat #right { background-color: var(--paper); }
 .wmsg.kgnav { background: none; border: 0; box-shadow: none; padding: 0; align-self: stretch; }
 .kgnavrow { display: flex; gap: .3rem; }
 .kgnavbtn {
-  font-family: "Newsreader", serif; font-weight: 700; font-size: .76rem;
+  font-family: var(--font); font-weight: 700; font-size: .76rem;
   letter-spacing: .04em; background: var(--card); color: var(--ink-soft);
-  border: 1.5px solid var(--rule); border-radius: 10px; padding: .3rem .8rem; cursor: pointer;
+  border: 1.5px solid var(--rule); border-radius: 7px; padding: .3rem .8rem; cursor: pointer;
 }
 .kgnavbtn.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .kgnavbtn:hover { color: var(--ink); }
@@ -394,7 +390,7 @@ body.kgchat #right { background-color: var(--paper); }
 .kgmd li::marker { color: var(--ink-soft); }
 .kgmd code {
   font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .86em;
-  background: var(--paper-deep); border-radius: 5px; padding: .05rem .25rem;
+  background: var(--paper-deep); border-radius: 4px; padding: .05rem .25rem;
 }
 .kgmd .kgmdh { display: block; margin: .3rem 0 .15rem; }
 .toolbar { gap: .35rem; }
@@ -423,7 +419,7 @@ main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
   color: var(--ink-soft); padding: 0 1.3rem; margin-top: .3rem;
 }
 
-.wmsg { max-width: 94%; padding: .7rem .9rem; border-radius: 13px; font-size: .96rem;
+.wmsg { max-width: 94%; padding: .7rem .9rem; border-radius: 9px; font-size: .96rem;
   line-height: 1.5; animation: rise .35s ease both;
   /* previews carry unbroken strings (a JSON sample row, a long column list) —
      break them anywhere rather than letting them run past the card edge */
@@ -437,13 +433,13 @@ main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
 .wmsg.recap {
   align-self: flex-start; max-width: 90%; margin-left: 1.1rem;
   font-size: .86rem; color: var(--ink-soft);
-  background: var(--card-2); border: 1px dashed var(--rule); border-radius: 11px;
+  background: var(--card-2); border: 1px dashed var(--rule); border-radius: 8px;
   padding: .5rem .8rem;
 }
 .wmsg.recap b { color: var(--teal-text); font-style: normal; }
 .wmsg.formcard {
   margin-left: 1.1rem; max-width: 92%;
-  background: var(--card-2); border: 1.5px solid var(--rule); border-radius: 13px;
+  background: var(--card-2); border: 1.5px solid var(--rule); border-radius: 9px;
   box-shadow: var(--shadow); display: flex; flex-wrap: wrap; gap: .6rem; align-items: center;
   padding: .8rem .9rem;
 }
@@ -461,9 +457,9 @@ main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
 .wmsg pre { white-space: pre-wrap; }
 .wrow { width: 100%; min-width: 0; }
 .wsave {
-  font-family: "Newsreader", serif; font-weight: 700; letter-spacing: .05em;
+  font-family: var(--font); font-weight: 700; letter-spacing: .05em;
   font-size: .8rem; color: var(--on-teal); background: var(--teal-fill); border: 1.5px solid var(--teal-fill);
-  border-radius: 10px; padding: .48rem 1.15rem; cursor: pointer; box-shadow: var(--shadow);
+  border-radius: 7px; padding: .48rem 1.15rem; cursor: pointer; box-shadow: var(--shadow);
   transition: transform .16s ease, background .18s ease, box-shadow .16s ease;
 }
 .wsave:hover:not(:disabled) { background: var(--teal-bright); color: #06231f; transform: translateY(-1px); box-shadow: var(--shadow-lg); }
@@ -472,7 +468,7 @@ main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
 
 /* chat bubbles */
 .chat { max-width: 82%; padding: .7rem 1rem; line-height: 1.55; font-size: .98rem;
-  border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: var(--shadow);
+  border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: var(--shadow);
   animation: rise .35s ease both; }
 .chat.user { align-self: flex-end; background: var(--ink); color: var(--paper);
   border-bottom-right-radius: 3px; }
@@ -484,18 +480,18 @@ main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
 /* approval cards */
 .approval { align-self: flex-start; max-width: 92%; margin-left: 1.1rem;
   background: var(--card); border: 1.5px solid var(--rule); border-left: 4px solid var(--amber);
-  border-radius: 13px; box-shadow: var(--shadow); padding: .75rem .9rem; font-size: .9rem;
+  border-radius: 9px; box-shadow: var(--shadow); padding: .75rem .9rem; font-size: .9rem;
   animation: rise .35s ease both; }
-.approval h4 { font-family: "Fraunces", serif; font-weight: 700; font-size: .95rem; margin-bottom: .35rem; color: var(--ink); }
+.approval h4 { font-family: var(--font); font-weight: 700; font-size: .95rem; margin-bottom: .35rem; color: var(--ink); }
 .approval pre { max-height: 8rem; overflow: auto; font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: .74rem; background: var(--card-2); border-radius: 8px; padding: .5rem .6rem;
+  font-size: .74rem; background: var(--card-2); border-radius: 6px; padding: .5rem .6rem;
   white-space: pre-wrap; word-break: break-all; }
 .approval .actions { display: flex; gap: .5rem; margin-top: .5rem; }
 .approval .actions input { flex: 1; }
 .approval .ok { background: var(--teal-fill); color: var(--on-teal); border-color: var(--teal-fill); }
 .approval .no { color: var(--danger); border-color: var(--danger); }
-.approval .ok, .approval .no { font-family: "Newsreader", serif; font-weight: 700; font-size: .78rem;
-  letter-spacing: .04em; border-width: 1.5px; border-style: solid; border-radius: 10px;
+.approval .ok, .approval .no { font-family: var(--font); font-weight: 700; font-size: .78rem;
+  letter-spacing: .04em; border-width: 1.5px; border-style: solid; border-radius: 7px;
   padding: .4rem .9rem; cursor: pointer; box-shadow: var(--shadow); transition: transform .15s ease; }
 .approval .ok:hover { transform: translateY(-1px); }
 .approval .no:hover { background: var(--danger); color: #fff; }
@@ -513,10 +509,10 @@ main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
 }
 #right > * { position: relative; }
 #right h3 {
-  font-family: "Fraunces", serif; font-weight: 700; font-size: 1.05rem;
+  font-family: var(--font); font-weight: 700; font-size: 1.05rem;
   letter-spacing: -.01em; margin-bottom: .3rem;
 }
-#right h3 small { font-family: "Newsreader", serif; font-variant: small-caps;
+#right h3 small { font-family: var(--font); font-variant: small-caps;
   letter-spacing: .14em; font-size: .68rem; font-weight: 400; color: var(--ink-soft); }
 #runbanner { font-variant: small-caps; letter-spacing: .1em; font-size: .82rem;
   color: var(--ink-soft); font-style: italic; margin-bottom: 0rem; min-height: 1.1rem; }
@@ -526,12 +522,12 @@ main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
 .fcempty { opacity: .6; font-style: italic; font-size: .95rem; padding: 3rem 1rem; text-align: center; max-width: 22rem; }
 .fcnode {
   width: min(23rem, 92%); background: var(--card-2); border: 1.5px solid var(--rule);
-  border-radius: 14px; padding: .55rem .85rem; text-align: center; box-shadow: var(--shadow);
+  border-radius: 10px; padding: .55rem .85rem; text-align: center; box-shadow: var(--shadow);
   animation: rise .3s ease both; transition: border-color .25s ease, box-shadow .25s ease;
 }
 .fcnode .fckind { font-variant: small-caps; letter-spacing: .16em; font-size: .66rem;
   color: var(--teal-text); font-weight: 700; }
-.fcnode .fcname { font-family: "Fraunces", serif; font-weight: 600; font-size: .92rem;
+.fcnode .fcname { font-family: var(--font); font-weight: 600; font-size: .92rem;
   color: var(--ink); word-break: break-all; line-height: 1.2; margin: .1rem 0; }
 .fcnode .fcstat { font-variant: small-caps; letter-spacing: .1em; font-size: .68rem; color: var(--ink-soft); }
 .fcnode.configured, .fcnode.validated, .fcnode.generated, .fcnode.deployed { border-color: var(--cyan); }
@@ -550,20 +546,20 @@ main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
 /* a cluster of input tables that fan into one downstream node */
 .fccluster {
   width: min(23rem, 92%); background: var(--card-2);
-  border: 1.5px dashed var(--cyan); border-radius: 14px; padding: .5rem .7rem;
+  border: 1.5px dashed var(--cyan); border-radius: 10px; padding: .5rem .7rem;
   box-shadow: var(--shadow); animation: rise .3s ease both;
   display: flex; flex-direction: column; gap: .35rem; text-align: center;
 }
 .fccluster .fckind { font-variant: small-caps; letter-spacing: .16em; font-size: .66rem;
   color: var(--teal-text); font-weight: 700; }
-.fcsrc { background: var(--card); border: 1px solid var(--rule); border-radius: 9px;
+.fcsrc { background: var(--card); border: 1px solid var(--rule); border-radius: 6px;
   padding: .3rem .5rem; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .76rem;
   color: var(--ink); word-break: break-all; }
-.fcsrc .fcdetail { font-family: "Newsreader", serif; }
+.fcsrc .fcdetail { font-family: var(--font); }
 /* production hosts fan out horizontally under one header */
 .fcprodwrap {
   width: min(34rem, 98%); background: var(--card-2);
-  border: 1.5px dashed var(--cyan); border-radius: 14px; padding: .5rem .5rem;
+  border: 1.5px dashed var(--cyan); border-radius: 10px; padding: .5rem .5rem;
   box-shadow: var(--shadow); animation: rise .3s ease both;
   display: flex; flex-direction: column; gap: .4rem; align-items: center;
 }
@@ -619,10 +615,10 @@ details#log summary { font-variant: small-caps; letter-spacing: .12em; font-size
 }
 #signin b { color: var(--danger); }
 #signin button {
-  font-family: "Newsreader", serif; font-weight: 700; font-size: .78rem;
+  font-family: var(--font); font-weight: 700; font-size: .78rem;
   margin-left: .6rem; padding: .3rem .8rem; cursor: pointer;
   background: var(--teal-fill); color: var(--on-teal);
-  border: 1.5px solid var(--teal-fill); border-radius: 10px;
+  border: 1.5px solid var(--teal-fill); border-radius: 7px;
 }
 #signin .w_details { margin-top: .3rem; }
 
@@ -632,10 +628,10 @@ details#log summary { font-variant: small-caps; letter-spacing: .12em; font-size
    touches a wizard card that is already on screen. */
 .viewToggle {
   display: inline-flex; align-items: stretch; border: 1.5px solid var(--ink);
-  border-radius: 11px; overflow: hidden; box-shadow: var(--shadow);
+  border-radius: 8px; overflow: hidden; box-shadow: var(--shadow);
 }
 .viewToggle button {
-  font-family: "Newsreader", Georgia, serif; font-weight: 700; font-size: .76rem;
+  font-family: var(--font); font-weight: 700; font-size: .76rem;
   letter-spacing: .06em; padding: .42rem .85rem; cursor: pointer;
   background: var(--card); color: var(--ink); border: 0; white-space: nowrap;
   transition: background .18s ease, color .18s ease;
@@ -649,7 +645,7 @@ body[data-view="executive"] .techOnly { display: none !important; }
 /* VD-3: projector legibility. The whole page steps up a little rather than
    individual rules being retuned, so nothing can drift out of proportion. */
 body[data-view="executive"] { font-size: 1.08rem; }
-body[data-view="executive"] .wmsg { font-size: 1.02rem; }
+body[data-view="executive"] .wmsg { font-size: 0.95rem; }
 body[data-view="executive"] .wmsg .w_details,
 body[data-view="executive"] #runhistory { font-size: .88rem; }
 body[data-view="executive"] .fcdetail, body[data-view="executive"] .fcstat { font-size: .8rem; }
@@ -673,32 +669,37 @@ body[data-focus="1"] .fcnode { width: min(34rem, 70%); }
 :root[data-zoom="3"] { font-size: 140%; }
 
 /* Presenter tools: the destructive three, one intentional gesture away (UX-7) */
-.presenterTools > summary {
-  font-family: "Newsreader", serif; font-weight: 700; font-size: .76rem;
-  letter-spacing: .06em; color: var(--ink-soft); cursor: pointer;
-  list-style: none; padding: .3rem .2rem;
+/* A menu in both views: one click opens it, hovering a row flies out the
+   things that row can delete. The hidden .ptbody keeps the real controls. */
+.presenterTools { position: relative; }
+.presenterTools > .ptbody { display: none !important; }
+.ptCaret { font-size: .7em; margin-left: .2rem; }
+.ptMenu, .ptSub {
+  position: absolute; z-index: 50; min-width: 13rem;
+  background: var(--card); color: var(--ink);
+  border: 1.5px solid var(--rule); border-radius: 8px; box-shadow: var(--shadow-lg);
+  padding: .3rem 0; font-size: .86rem;
 }
-.presenterTools > summary::before { content: "\25B8 "; }
-.presenterTools[open] > summary::before { content: "\25BE "; }
-.presenterTools[open] > .ptbody {
-  display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; padding: .2rem 0 .1rem;
+.ptMenu { top: calc(100% + .35rem); left: 0; }
+.ptMenu[hidden] { display: none; }
+.ptItem {
+  position: relative; display: flex; align-items: center; justify-content: space-between;
+  gap: 1.2rem; padding: .5rem .9rem; cursor: pointer; white-space: nowrap; outline: none;
 }
-/* belt and braces: whatever the UA does with a closed details, an open one in
-   Technical view lays its controls out inline in the bar */
-body[data-view="technical"] .presenterTools[open] > .ptbody { padding: 0; }
-.presenterTools > .ptbody { display: none; }
-/* In Technical view the disclosure disappears and its buttons sit in the bar.
-   display:contents on the <details> is load-bearing: as a flex item its width
-   is computed from the <summary>, which is hidden here, so the wrapper measured
-   ~0 while its 865px body spilled outside the toolbar box - "Clear all" landed
-   past the right-hand edge of the viewport and looked missing. contents takes
-   the wrapper out of layout so its children become real flex items of the bar. */
-body[data-view="technical"] .presenterTools { display: contents; }
-body[data-view="technical"] .presenterTools > summary { display: none; }
-body[data-view="technical"] .presenterTools > .ptbody {
-  /* wrap here too: as one non-wrapping flex item this box was ~865px and
-     its own children overflowed it even once the toolbar itself wrapped */
-  display: flex; flex-wrap: wrap; gap: .4rem; align-items: center;
+.ptItem:hover, .ptItem:focus-visible, .ptItem.ptOpen { background: var(--paper-deep); }
+.ptArrow { font-size: .8em; color: var(--ink-soft); }
+.ptDanger { color: var(--danger); font-weight: 700; }
+.ptSep { height: 1px; margin: .3rem 0; background: var(--rule); }
+/* the flyout sits flush with its row; overlapping the border by a pixel means
+   the pointer never crosses a gap on its way in and closes it */
+.ptSub { display: none; top: -.3rem; left: calc(100% - 2px); max-height: 60vh; overflow-y: auto; max-width: 30rem; }
+.ptItem:hover > .ptSub, .ptItem.ptOpen > .ptSub { display: block; }
+.ptSub .ptItem { display: block; overflow: hidden; text-overflow: ellipsis; color: var(--ink); font-weight: 400; }
+.ptSub .ptItem:hover, .ptSub .ptItem:focus-visible { background: var(--danger); color: var(--paper); }
+.ptSub .ptEmpty { padding: .5rem .9rem; color: var(--ink-soft); font-style: italic; white-space: nowrap; }
+/* narrow screens: no room to fly right, so the submenu drops in below */
+@media (max-width: 640px) {
+  .ptSub { position: static; box-shadow: none; border: 0; border-radius: 0; padding-left: .8rem; max-width: none; }
 }
 
 /* ============ Results panel (UX-3 / DM-1) ============
@@ -708,21 +709,21 @@ body[data-view="technical"] .presenterTools > .ptbody {
 #results { margin-bottom: 1.1rem; }
 #results:empty { display: none; }
 .rp {
-  background: var(--card-2); border: 1.5px solid var(--rule); border-radius: 14px;
+  background: var(--card-2); border: 1.5px solid var(--rule); border-radius: 10px;
   box-shadow: var(--shadow); padding: .8rem .95rem; animation: rise .3s ease both;
 }
 .rphead {
   display: flex; align-items: baseline; justify-content: space-between; gap: .8rem;
   flex-wrap: wrap; margin-bottom: .7rem;
 }
-.rptitle { font-family: "Fraunces", serif; font-weight: 800; font-size: 1rem; letter-spacing: -.01em; }
+.rptitle { font-family: var(--font); font-weight: 800; font-size: 1rem; letter-spacing: -.01em; }
 .rptitle small { font-variant: small-caps; letter-spacing: .16em; font-size: .66rem;
-  color: var(--ink-soft); font-family: "Newsreader", serif; font-weight: 400; display: block; }
+  color: var(--ink-soft); font-family: var(--font); font-weight: 400; display: block; }
 .rpsched { font-size: .76rem; color: var(--ink-soft); font-style: italic; }
 .rpfigs { display: flex; flex-wrap: wrap; gap: .9rem 1.6rem; }
 .rpfig { min-width: 7.5rem; }
 .rpfig .k { font-variant: small-caps; letter-spacing: .14em; font-size: .68rem; color: var(--ink-soft); }
-.rpfig .v { font-family: "Fraunces", serif; font-weight: 800; font-size: 1.35rem; line-height: 1.2; }
+.rpfig .v { font-family: var(--font); font-weight: 800; font-size: 1.35rem; line-height: 1.2; }
 .rpfig .s { font-size: .74rem; color: var(--ink-soft); font-style: italic; }
 /* status by colour AND shape - never colour alone */
 .rpdot { font-size: .9rem; margin-right: .3rem; }
@@ -741,9 +742,9 @@ body[data-view="technical"] .presenterTools > .ptbody {
 .rptable th { font-variant: small-caps; letter-spacing: .1em; color: var(--ink-soft); font-weight: 400; }
 .rpact { margin-top: .7rem; display: flex; gap: .5rem; flex-wrap: wrap; }
 .rpact button {
-  font-family: "Newsreader", serif; font-weight: 700; font-size: .74rem;
+  font-family: var(--font); font-weight: 700; font-size: .74rem;
   background: var(--card); color: var(--ink); border: 1.5px solid var(--rule);
-  border-radius: 10px; padding: .3rem .7rem; cursor: pointer;
+  border-radius: 7px; padding: .3rem .7rem; cursor: pointer;
 }
 .rpact button:hover { border-color: var(--teal); color: var(--teal-text); }
 
@@ -758,7 +759,7 @@ body[data-view="technical"] .presenterTools > .ptbody {
 }
 .pvwtitle { font-variant: small-caps; letter-spacing: .14em; font-size: .7rem; color: var(--ink-soft); }
 .pvwcount { font-size: .72rem; color: var(--ink-soft); font-style: italic; }
-.pvwrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--card); }
+.pvwrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 7px; background: var(--card); }
 .pvw table { border-collapse: collapse; width: 100%; font-size: .76rem; }
 .pvw th, .pvw td {
   padding: .3rem .55rem; text-align: left; border-bottom: 1px solid var(--rule);
@@ -786,16 +787,16 @@ body[data-view="technical"] .presenterTools > .ptbody {
 }
 /* executive: bigger, calmer, no monospace, no types */
 body[data-view="executive"] .pvw table { font-size: .88rem; }
-body[data-view="executive"] .pvw td { font-family: "Newsreader", Georgia, serif; }
-body[data-view="executive"] .pvw th { font-family: "Newsreader", Georgia, serif; }
+body[data-view="executive"] .pvw td { font-family: var(--font); }
+body[data-view="executive"] .pvw th { font-family: var(--font); }
 body[data-view="executive"] .pvw th, body[data-view="executive"] .pvw td { padding: .42rem .7rem; }
 body[data-view="executive"] .pvwtitle { font-size: .74rem; color: var(--teal-text); }
 
 /* ============ Narrative surfaces ============ */
 /* BS-1: one business-outcome line above the existing procedural guidance */
 .wmsg .outcome {
-  display: block; font-family: "Fraunces", serif; font-weight: 700;
-  font-size: 1.02rem; line-height: 1.35; letter-spacing: -.01em;
+  display: block; font-family: var(--font); font-weight: 700;
+  font-size: 0.95rem; line-height: 1.35; letter-spacing: -.01em;
   color: var(--teal-text); margin-bottom: .45rem;
 }
 /* While the opening card is up it is the ONLY thing in the conversation. The
@@ -807,11 +808,11 @@ body[data-view="executive"] .pvwtitle { font-size: .74rem; color: var(--teal-tex
 /* UX-1: the opening card - the business question before any mechanics */
 .wmsg.opening {
   align-self: center; max-width: 96%; text-align: center;
-  background: var(--card); border: 1.5px solid var(--teal); border-radius: 16px;
+  background: var(--card); border: 1.5px solid var(--teal); border-radius: 11px;
   box-shadow: var(--shadow-lg); padding: 1.5rem 1.6rem;
 }
 .wmsg.opening .oq {
-  font-family: "Fraunces", serif; font-weight: 800; letter-spacing: -.015em;
+  font-family: var(--font); font-weight: 800; letter-spacing: -.015em;
   font-size: clamp(1.15rem, 2.6vw, 1.7rem); line-height: 1.25; margin-bottom: .9rem;
 }
 .wmsg.opening ul { list-style: none; display: flex; flex-direction: column; gap: .3rem;
@@ -819,7 +820,7 @@ body[data-view="executive"] .pvwtitle { font-size: .74rem; color: var(--teal-tex
 .wmsg.opening .eap { font-size: .74rem; font-style: italic; color: var(--ink-soft); margin-top: 1rem; }
 /* BS-2: the closing before/after */
 .wmsg.closing { align-self: center; max-width: 96%; background: var(--card);
-  border: 1.5px solid var(--rule); border-radius: 14px; box-shadow: var(--shadow); padding: 1rem 1.1rem; }
+  border: 1.5px solid var(--rule); border-radius: 10px; box-shadow: var(--shadow); padding: 1rem 1.1rem; }
 .closegrid { display: grid; grid-template-columns: 1fr 1fr; gap: .1rem 1.3rem; font-size: .88rem; }
 .closegrid .h { font-variant: small-caps; letter-spacing: .12em; font-size: .74rem;
   color: var(--ink-soft); border-bottom: 1.5px solid var(--rule); padding-bottom: .3rem; margin-bottom: .4rem; }
@@ -827,7 +828,7 @@ body[data-view="executive"] .pvwtitle { font-size: .74rem; color: var(--teal-tex
 .closegrid .c { padding: .18rem 0; }
 .closegrid .c.now { color: var(--ink); }
 .closegrid .c.was { color: var(--ink-soft); }
-.closegrid .c.big { font-family: "Fraunces", serif; font-weight: 800; font-size: 1.05rem; }
+.closegrid .c.big { font-family: var(--font); font-weight: 800; font-size: 1.05rem; }
 .wmsg.closing .qualifier { font-size: .74rem; font-style: italic; color: var(--ink-soft); margin-top: .7rem; }
 @media (max-width: 620px) { .closegrid { grid-template-columns: 1fr; } }
 
@@ -835,7 +836,7 @@ body[data-view="executive"] .pvwtitle { font-size: .74rem; color: var(--teal-tex
 .wmsg.errorcard {
   align-self: flex-start; max-width: 92%; margin-left: 1.1rem;
   background: var(--card); border: 1px solid var(--rule); border-left: 4px solid var(--danger);
-  border-radius: 11px; padding: .6rem .85rem; font-size: .9rem;
+  border-radius: 8px; padding: .6rem .85rem; font-size: .9rem;
 }
 .wmsg.errorcard .ehead { font-weight: 700; color: var(--danger); }
 .wmsg.errorcard details { margin-top: .35rem; }
@@ -847,7 +848,7 @@ body[data-view="executive"] .pvwtitle { font-size: .74rem; color: var(--teal-tex
 /* scrollbars */
 #convo::-webkit-scrollbar, #right::-webkit-scrollbar, #events::-webkit-scrollbar { width: 10px; }
 #convo::-webkit-scrollbar-thumb, #right::-webkit-scrollbar-thumb, #events::-webkit-scrollbar-thumb {
-  background: var(--rule); border-radius: 10px; }
+  background: var(--rule); border-radius: 7px; }
 #convo::-webkit-scrollbar-thumb:hover, #right::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); }
 
 @media (max-width: 720px) {
@@ -858,29 +859,11 @@ body[data-view="executive"] .pvwtitle { font-size: .74rem; color: var(--teal-tex
 </head>
 <body>
 <header>
-  <div class="masthead">
-    <div class="brand">
-      <h1><span class="t-etl">Data</span>&#8239;<span class="t-wiz">Integrator</span></h1>
-      <div class="tagline">lake engine &middot; ai-guided data pipelines</div>
-    </div>
-    <div class="headerTools">
-      <span id="status" class="status">disconnected</span>
-      <label class="modelPick techOnly" for="modelsel">
-        <span class="modelPickLabel">model</span>
-        <select id="modelsel" title="LLM serving the architect, SQL and index-advisor agents"></select>
-      </label>
-      <!-- Two-state segmented control, not an icon: the presenter has to be
-           able to read the state from across the room, and an engineer has to
-           be able to find it without being told. Ctrl+Shift+E switches it. -->
-      <div class="viewToggle" role="group" aria-label="Audience view">
-        <button id="viewTech" type="button" aria-pressed="true">Technical</button>
-        <button id="viewExec" type="button" aria-pressed="false">Executive</button>
-      </div>
-      <button id="focusBtn" class="iconBtn" title="Full-width flowchart (Ctrl+Shift+F)" aria-label="Full-width flowchart" aria-pressed="false">&#9974;</button>
-      <button id="themeToggle" class="iconBtn techOnly" title="Toggle day / night" aria-label="Toggle day / night">&#9789;</button>
-    </div>
-  </div>
+  <!-- one row: title, pipeline actions, then status and view controls -->
   <div class="toolbar">
+    <div class="brand">
+      <h1><span class="t-etl">Data </span><span class="t-wiz">Integrator</span></h1>
+    </div>
     <div class="tgroup">
       <select id="pipelist" title="ETLs created so far"></select>
       <button id="loadchart" class="btn" title="Show this pipeline's flowchart and run history">Flowchart</button>
@@ -895,9 +878,23 @@ body[data-view="executive"] .pvwtitle { font-size: .74rem; color: var(--teal-tex
          The table and model pickers live in here because their only purpose is
          to choose what gets deleted - leaving them outside put a destructive
          control's argument in the main toolbar while hiding the verb. -->
-    <details id="presenterTools" class="presenterTools">
-      <summary title="Destructive actions - deleting a pipeline, dropping a table, an ML model, an MCP tool or a knowledge base, clearing everything">Presenter tools</summary>
-      <div class="ptbody">
+    <!-- The menu is the only visible surface. The original pickers and buttons
+         below stay in the DOM, hidden, because every refresh*() and delete
+         handler reads them: a menu entry just selects the option and clicks
+         the button, so the confirm() dialogs are exactly the ones they were. -->
+    <div id="presenterTools" class="presenterTools">
+      <button id="ptBtn" class="btn" type="button" aria-haspopup="menu" aria-expanded="false"
+              title="Destructive actions - deleting a pipeline, dropping a table, an ML model, an MCP tool or a knowledge base, clearing everything">Presenter tools <span class="ptCaret">&#9662;</span></button>
+      <div id="ptMenu" class="ptMenu" role="menu" hidden>
+        <div class="ptItem" role="menuitem" aria-haspopup="menu" tabindex="-1" data-sel="pipelist" data-btn="delpipe" data-empty="No pipelines yet">Delete pipeline<span class="ptArrow">&#9656;</span><div class="ptSub" role="menu"></div></div>
+        <div class="ptItem" role="menuitem" aria-haspopup="menu" tabindex="-1" data-sel="tablelist" data-btn="deltable" data-empty="No tables yet">Drop table<span class="ptArrow">&#9656;</span><div class="ptSub" role="menu"></div></div>
+        <div class="ptItem" role="menuitem" aria-haspopup="menu" tabindex="-1" data-sel="mlmodellist" data-btn="delmodel" data-empty="No models yet">Delete ML model<span class="ptArrow">&#9656;</span><div class="ptSub" role="menu"></div></div>
+        <div class="ptItem" role="menuitem" aria-haspopup="menu" tabindex="-1" data-sel="mcptoollist" data-btn="delmcptool" data-empty="No MCP tools yet">Delete MCP tool<span class="ptArrow">&#9656;</span><div class="ptSub" role="menu"></div></div>
+        <div class="ptItem" role="menuitem" aria-haspopup="menu" tabindex="-1" data-sel="kglist" data-btn="delkg" data-empty="No knowledge bases yet">Clear knowledge base<span class="ptArrow">&#9656;</span><div class="ptSub" role="menu"></div></div>
+        <div class="ptSep" role="separator"></div>
+        <div class="ptItem ptDanger" role="menuitem" tabindex="-1" data-btn="clearall">Clear all&hellip;</div>
+      </div>
+      <div class="ptbody" hidden>
         <button id="delpipe" class="btn danger" title="Delete the selected pipeline (its tables are kept)">Delete Pipeline</button>
         <span class="tsep"></span>
         <select id="tablelist" title="Tables the wizard built: landing / staging / target, foreign tables and linked views"></select>
@@ -914,7 +911,25 @@ body[data-view="executive"] .pvwtitle { font-size: .74rem; color: var(--teal-tex
         <span class="tsep"></span>
         <button id="clearall" class="btn danger" title="Delete every pipeline and every table the wizard built">Clear all</button>
       </div>
-    </details>
+    </div>
+    <!-- status, audience view and display controls share the action row,
+         pushed to its right-hand end -->
+    <div class="headerTools">
+      <span id="status" class="status">disconnected</span>
+      <label class="modelPick techOnly" for="modelsel">
+        <span class="modelPickLabel">model</span>
+        <select id="modelsel" title="LLM serving the architect, SQL and index-advisor agents"></select>
+      </label>
+      <!-- Two-state segmented control, not an icon: the presenter has to be
+           able to read the state from across the room, and an engineer has to
+           be able to find it without being told. Ctrl+Shift+E switches it. -->
+      <div class="viewToggle" role="group" aria-label="Audience view">
+        <button id="viewTech" type="button" aria-pressed="true">Technical</button>
+        <button id="viewExec" type="button" aria-pressed="false">Executive</button>
+      </div>
+      <button id="focusBtn" class="iconBtn" title="Full-width flowchart (Ctrl+Shift+F)" aria-label="Full-width flowchart" aria-pressed="false">&#9974;</button>
+      <button id="themeToggle" class="iconBtn" title="Toggle day / night" aria-label="Toggle day / night">&#9789;</button>
+    </div>
     <!-- the wizard tracks the live run/pipeline here; the picker drives them -->
     <input id="runid" type="hidden">
     <input id="pipeid" type="hidden">
@@ -970,9 +985,15 @@ body[data-view="executive"] .pvwtitle { font-size: .74rem; color: var(--teal-tex
   // Executive view can open on the theme verified on the room's projector and
   // leaving it restores whatever the engineer had set.
   window.__applyThemeTransient = t => applyTheme(t);
-  window.__userTheme = () => stored || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  window.__flipThemeTransient = () =>
+    applyTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+  // read live, not the load-time value: a toggle since then is the preference
+  window.__userTheme = () => localStorage.getItem(KEY) || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 })();
-document.getElementById("themeToggle").onclick = () => window.__toggleTheme();
+// In Executive view the toggle is for the room, not the engineer: it flips the
+// theme without storing it, so going back to Technical restores their choice.
+document.getElementById("themeToggle").onclick = () =>
+  (typeof EXEC === "function" && EXEC()) ? window.__flipThemeTransient() : window.__toggleTheme();
 
 /* ============ Audience view: Technical / Executive ============
    Two views of the same application, switched live (IMPROVEMENTS_SPEC 1.1).
@@ -1028,12 +1049,8 @@ function applyView() {
   // showTab(), paneCache, chartCache and resetTab() all key off them.
   const labels = EXEC() ? Object.assign({}, TECH_TABS, EXEC_TABS, sc.tabs || {}) : TECH_TABS;
   document.querySelectorAll(".tab").forEach(t => { t.textContent = labels[t.dataset.tab] || t.textContent; });
-  // Drive the disclosure's OPEN state, rather than relying on CSS to reveal the
-  // contents of a closed <details>. Browsers differ on whether a display rule
-  // on a closed details' child actually renders it - which is exactly how the
-  // Technical toolbar ended up empty. Forcing open=true is unambiguous
-  // everywhere; the summary is hidden by CSS so it still reads as a plain bar.
-  $("presenterTools").open = !EXEC();
+  // switching audience mid-demo must not leave a destructive menu hanging open
+  if (typeof ptClose === "function") ptClose();
   // VD-4: Executive view opens on the theme verified on the room's hardware
   // (scenario.execTheme, "light" unless configured otherwise) without the
   // presenter touching anything. Technical view keeps the engineer's own.
@@ -1250,7 +1267,7 @@ function scheduleHtml(intervalDefault) {
      <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center">
        <div class="w_intmode"><label>Call interval (s) <input class="s_poll" type="number" min="5" value="${intervalDefault || 300}"></label></div>
      </div>
-     <div class="w_schedmode" style="display:none;flex-direction:column;gap:.35rem;border:1px dashed var(--teal);border-radius:10px;padding:.5rem">
+     <div class="w_schedmode" style="display:none;flex-direction:column;gap:.35rem;border:1px dashed var(--teal);border-radius:7px;padding:.5rem">
        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;font-variant:normal;letter-spacing:0">
          <b style="font-size:.78rem">Days:</b>
          <label style="font-variant:normal;letter-spacing:0"><input type="checkbox" class="w_everyday" checked style="width:auto"> Every day</label>
@@ -2046,11 +2063,11 @@ async function checkUiVersion() {
     const bar = document.createElement("div");
     bar.id = "uistale";
     bar.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:1rem;z-index:99;" +
-      "background:var(--ink);color:var(--paper);border-radius:12px;padding:.5rem .9rem;" +
-      "font-family:Newsreader,serif;font-size:.8rem;box-shadow:var(--shadow);display:flex;gap:.6rem;align-items:center";
+      "background:var(--ink);color:var(--paper);border-radius:8px;padding:.5rem .9rem;" +
+      "font-family:var(--font);font-size:.8rem;box-shadow:var(--shadow);display:flex;gap:.6rem;align-items:center";
     bar.innerHTML = `<span>This page is running an older version of the app.</span>` +
       `<button style="font:inherit;font-weight:700;background:var(--paper);color:var(--ink);` +
-      `border:0;border-radius:8px;padding:.25rem .7rem;cursor:pointer">Reload</button>`;
+      `border:0;border-radius:6px;padding:.25rem .7rem;cursor:pointer">Reload</button>`;
     bar.querySelector("button").onclick = () => location.reload(true);
     document.body.appendChild(bar);
   } catch (e) { /* offline or mid-restart: say nothing */ }
@@ -2071,8 +2088,8 @@ async function wizardStep2() {
      <span class="w_connwrap"></span>
      <label class="w_serverlbl">Server name <input class="w_server" size="16"></label>
      <div class="wrow" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
-       <button class="w_newconn" style="font-family:Newsreader,serif;font-weight:700;font-size:.74rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:10px;padding:.32rem .7rem;cursor:pointer">+ New SQL Gateway connection</button>
-       <button class="w_skip2" style="font-family:Newsreader,serif;font-weight:700;font-size:.74rem;background:var(--card);color:var(--ink-soft);border:1.5px dashed var(--rule);border-radius:10px;padding:.32rem .7rem;cursor:pointer" title="The foreign server already exists - just discover its tables">Skip (server exists)</button>
+       <button class="w_newconn" style="font-family:var(--font);font-weight:700;font-size:.74rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:7px;padding:.32rem .7rem;cursor:pointer">+ New SQL Gateway connection</button>
+       <button class="w_skip2" style="font-family:var(--font);font-weight:700;font-size:.74rem;background:var(--card);color:var(--ink-soft);border:1.5px dashed var(--rule);border-radius:7px;padding:.32rem .7rem;cursor:pointer" title="The foreign server already exists - just discover its tables">Skip (server exists)</button>
      </div>
      <div class="w_connform" style="display:none;width:100%"></div>`,
     "Save", async c => {
@@ -2170,7 +2187,7 @@ async function wizardStep2() {
     if (box.style.display !== "none") { box.style.display = "none"; return; }
     box.style.display = "block";
     box.innerHTML =
-      `<div style="border:1px dashed var(--rule);border-radius:10px;padding:.6rem;margin-top:.5rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
+      `<div style="border:1px dashed var(--rule);border-radius:7px;padding:.6rem;margin-top:.5rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
          <label>Name <input class="c_name" size="16" value="my_connection"></label>
          <label>Kind <select class="c_kind"><option value="jdbc">JDBC</option><option value="odbc">ODBC</option></select></label>
          <label>Preset <select class="c_preset">${Object.keys(PRESETS).map(k => `<option>${k}</option>`).join("")}</select></label>
@@ -2182,7 +2199,7 @@ async function wizardStep2() {
          <span class="c_odbc" style="display:none"><label>DSN <input class="c_dsn" size="18"></label></span>
          <label>User <input class="c_user" size="12"></label>
          <label>Password <input class="c_pwd" type="password" size="12"></label>
-         <button class="c_create" style="font-family:Newsreader,serif;font-weight:700;font-size:.76rem;background:var(--teal-fill);color:var(--on-teal);border:1.5px solid var(--teal-fill);border-radius:10px;padding:.35rem .8rem;cursor:pointer">Create connection</button>
+         <button class="c_create" style="font-family:var(--font);font-weight:700;font-size:.76rem;background:var(--teal-fill);color:var(--on-teal);border:1.5px solid var(--teal-fill);border-radius:7px;padding:.35rem .8rem;cursor:pointer">Create connection</button>
          <span class="c_msg" style="font-size:.78rem;color:var(--ink-soft)"></span>
        </div>`;
     const applyPreset = () => {
@@ -2275,7 +2292,7 @@ async function wizardStepRest() {
     `<label>Table prefix <input class="r_base" size="14" value="api"></label>
      <div class="r_list" style="width:100%;display:flex;flex-direction:column;gap:.5rem"></div>
      <div class="wrow">
-       <button class="r_add" style="font-family:Newsreader,serif;font-weight:700;font-size:.74rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:10px;padding:.32rem .7rem;cursor:pointer">+ Add endpoint</button>
+       <button class="r_add" style="font-family:var(--font);font-weight:700;font-size:.74rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:7px;padding:.32rem .7rem;cursor:pointer">+ Add endpoint</button>
      </div>
      <span class="r_msg" style="font-size:.76rem;color:var(--ink-soft);width:100%"></span>`,
     "Save & mount", async c => {
@@ -2311,14 +2328,14 @@ async function wizardStepRest() {
   const list = card.querySelector(".r_list");
   const addRow = (path, name) => {
     const row = el(`
-      <div class="r_ep" style="border:1px dashed var(--rule);border-radius:10px;padding:.5rem;display:flex;flex-wrap:wrap;gap:.4rem;align-items:center">
+      <div class="r_ep" style="border:1px dashed var(--rule);border-radius:7px;padding:.5rem;display:flex;flex-wrap:wrap;gap:.4rem;align-items:center">
         <label>Path <input class="r_path" size="24" value="${esc(path || "")}" placeholder="/path/name"></label>
         <label>As <input class="r_name" size="12" value="${esc(name || "")}" placeholder="name"></label>
         <label>Paging <select class="r_paging" style="font-size:.78rem">${REST_PAGING.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select></label>
         <label>Page size <input class="r_size" type="number" min="1" value="100" style="max-width:6rem"></label>
         <label>Data path <input class="r_datapath" size="12" placeholder="auto"></label>
-        <button class="r_test" style="font-family:Newsreader,serif;font-weight:700;font-size:.74rem;background:var(--card);color:var(--ink);border:1.5px solid var(--ink);border-radius:10px;padding:.3rem .7rem;cursor:pointer">Test</button>
-        <button class="r_del" title="remove this endpoint" style="font-family:Newsreader,serif;font-size:.74rem;background:var(--card);color:#b4552d;border:1.5px solid var(--rule);border-radius:10px;padding:.3rem .6rem;cursor:pointer">&times;</button>
+        <button class="r_test" style="font-family:var(--font);font-weight:700;font-size:.74rem;background:var(--card);color:var(--ink);border:1.5px solid var(--ink);border-radius:7px;padding:.3rem .7rem;cursor:pointer">Test</button>
+        <button class="r_del" title="remove this endpoint" style="font-family:var(--font);font-size:.74rem;background:var(--card);color:#b4552d;border:1.5px solid var(--rule);border-radius:7px;padding:.3rem .6rem;cursor:pointer">&times;</button>
         <div class="r_out w_details" style="flex-basis:100%"></div>
       </div>`).firstElementChild;
     list.appendChild(row);
@@ -2499,15 +2516,15 @@ async function wizardStepBulk() {
     "change on its own. To import again, upload again.");
   const card = stepCard(
     `<div class="wrow" style="display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;width:100%">
-       <label class="b_drop" style="flex:1;min-width:14rem;display:flex;align-items:center;gap:.6rem;padding:.7rem .9rem;border:1.5px dashed var(--teal);border-radius:12px;background:color-mix(in srgb,var(--teal) 6%,transparent);cursor:pointer;transition:background .2s ease">
+       <label class="b_drop" style="flex:1;min-width:14rem;display:flex;align-items:center;gap:.6rem;padding:.7rem .9rem;border:1.5px dashed var(--teal);border-radius:8px;background:color-mix(in srgb,var(--teal) 6%,transparent);cursor:pointer;transition:background .2s ease">
          <span style="font-size:1.3rem;line-height:1">&#128193;</span>
          <span style="display:flex;flex-direction:column;line-height:1.25">
-           <span style="font-family:Fraunces,serif;font-weight:600;font-size:.9rem;color:var(--ink)">Choose a file&hellip;</span>
+           <span style="font-family:var(--font);font-weight:600;font-size:.9rem;color:var(--ink)">Choose a file&hellip;</span>
            <span class="b_fname" style="font-size:.74rem;color:var(--ink-soft)">CSV or XLSX &middot; drag &amp; drop or click</span>
          </span>
          <input class="b_file" type="file" accept=".csv,.xlsx" style="display:none">
        </label>
-       <button class="b_up" style="font-family:Newsreader,serif;font-weight:700;font-size:.78rem;background:var(--teal-fill);color:var(--on-teal);border:1.5px solid var(--teal-fill);border-radius:10px;padding:.5rem 1rem;cursor:pointer;box-shadow:var(--shadow)">Upload &amp; inspect</button>
+       <button class="b_up" style="font-family:var(--font);font-weight:700;font-size:.78rem;background:var(--teal-fill);color:var(--on-teal);border:1.5px solid var(--teal-fill);border-radius:7px;padding:.5rem 1rem;cursor:pointer;box-shadow:var(--shadow)">Upload &amp; inspect</button>
      </div>
      <span class="b_msg" style="font-size:.76rem;color:var(--ink-soft);width:100%"></span>
      <div class="b_form" style="display:none;width:100%">
@@ -2798,7 +2815,7 @@ async function wizardStepIndexes(base, pk, wm) {
      <div class="wrow x_rows" style="max-height:15rem;overflow:auto;display:flex;flex-direction:column;gap:.35rem">
        ${rows || `<span class="w_details">No index is worth building on this target &mdash; it is small, or every column is already covered.</span>`}
      </div>
-     <div class="wrow" style="border:1px dashed var(--teal);border-radius:10px;padding:.5rem">
+     <div class="wrow" style="border:1px dashed var(--teal);border-radius:7px;padding:.5rem">
        <label style="font-variant:normal;letter-spacing:0">
          <input type="checkbox" class="x_tablecol" ${tc.suggested ? "checked" : ""} style="width:auto">
          Store the whole table column-wise (columnar storage)
@@ -2807,8 +2824,8 @@ async function wizardStepIndexes(base, pk, wm) {
      </div>
      ${existing.length ? `<div class="w_details wrow">Already on this table: ${existing.map(e => esc(e.index_name) + " (" + esc(e.index_type) + ")").join(", ")}</div>` : ""}
      <div class="wrow" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
-       <button class="x_add" style="font-family:Newsreader,serif;font-weight:700;font-size:.74rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:10px;padding:.32rem .7rem;cursor:pointer" title="Index something the advisor did not propose - one column, or several for a composite">+ Add index</button>
-       <button class="x_skip" style="font-family:Newsreader,serif;font-weight:700;font-size:.74rem;background:var(--card);color:var(--ink-soft);border:1.5px dashed var(--rule);border-radius:10px;padding:.32rem .7rem;cursor:pointer" title="Leave the target as it is">Skip &amp; finish</button>
+       <button class="x_add" style="font-family:var(--font);font-weight:700;font-size:.74rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:7px;padding:.32rem .7rem;cursor:pointer" title="Index something the advisor did not propose - one column, or several for a composite">+ Add index</button>
+       <button class="x_skip" style="font-family:var(--font);font-weight:700;font-size:.74rem;background:var(--card);color:var(--ink-soft);border:1.5px dashed var(--rule);border-radius:7px;padding:.32rem .7rem;cursor:pointer" title="Leave the target as it is">Skip &amp; finish</button>
      </div>
      <span class="x_msg" style="font-size:.76rem;color:var(--ink-soft);width:100%"></span>`,
     "Create indexes & finish", async c => {
@@ -3281,15 +3298,15 @@ FROM ETLWIZARD.${first} a
     "<b>Preview</b> checks the columns and a sample; the target table is built to match. " +
     "Save it and the next step picks the load strategy and watermark.", "transform");
   const card = stepCard(
-    `<div class="wrow" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;padding:.5rem;border:1px dashed var(--teal);border-radius:10px">
+    `<div class="wrow" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;padding:.5rem;border:1px dashed var(--teal);border-radius:7px">
        <span style="font-variant:small-caps;letter-spacing:.1em;font-size:.72rem;color: var(--teal-text);width:100%">&#10024; describe the transformation in plain words &mdash; the local model writes the SQL</span>
        <input class="w_ai" style="flex:1;min-width:16rem" placeholder="e.g. total spent and order count per customer, only paid orders, names uppercase">
-       <button class="w_gen" style="font-family:Newsreader,serif;font-weight:700;font-size:.76rem;background:var(--teal-fill);color:var(--on-teal);border:1.5px solid var(--teal-fill);border-radius:10px;padding:.35rem .85rem;cursor:pointer">Generate SQL</button>
+       <button class="w_gen" style="font-family:var(--font);font-weight:700;font-size:.76rem;background:var(--teal-fill);color:var(--on-teal);border:1.5px solid var(--teal-fill);border-radius:7px;padding:.35rem .85rem;cursor:pointer">Generate SQL</button>
        <span class="w_amsg" style="font-size:.76rem;color:var(--ink-soft);width:100%"></span>
      </div>
      <textarea class="w_tsql" spellcheck="false" style="width:100%;min-height:11rem;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;line-height:1.45;resize:vertical">${esc(template)}</textarea>
      <div class="wrow" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
-       <button class="w_prev" style="font-family:Newsreader,serif;font-weight:700;font-size:.78rem;background:var(--card);color:var(--ink);border:1.5px solid var(--ink);border-radius:10px;padding:.4rem .9rem;cursor:pointer;box-shadow:var(--shadow)">Preview</button>
+       <button class="w_prev" style="font-family:var(--font);font-weight:700;font-size:.78rem;background:var(--card);color:var(--ink);border:1.5px solid var(--ink);border-radius:7px;padding:.4rem .9rem;cursor:pointer;box-shadow:var(--shadow)">Preview</button>
        <span class="w_pmsg" style="font-size:.78rem;color:var(--ink-soft)"></span>
      </div>
      <div class="wrow w_pcols"></div>`,
@@ -3697,6 +3714,69 @@ $("deltable").onclick = async () => {
   $("runbanner").innerHTML = `Dropped <b>${esc(j.dropped)}</b> (${esc(j.kind)})`;
   await refreshTables("");
 };
+
+/* ---- Presenter tools menu ----------------------------------------------
+   A menu with flyouts, built on the pickers above rather than beside them:
+   each submenu is read from its <select> the moment it opens, so it is never
+   staler than the picker, and choosing an entry selects that option and
+   clicks the real button. Every confirm() and refresh is the original one. */
+function ptClose() {
+  const menu = $("ptMenu");
+  if (!menu || menu.hidden) return;
+  menu.hidden = true;
+  $("ptBtn").setAttribute("aria-expanded", "false");
+  menu.querySelectorAll(".ptOpen").forEach(el => el.classList.remove("ptOpen"));
+}
+function ptOpen() {
+  const menu = $("ptMenu");
+  menu.hidden = false;
+  $("ptBtn").setAttribute("aria-expanded", "true");
+  menu.querySelectorAll(":scope > .ptItem[data-sel]").forEach(ptFill);
+}
+function ptFill(item) {
+  const sub = item.querySelector(".ptSub");
+  const opts = [...$(item.dataset.sel).options].filter(o => o.value);
+  const attr = s => esc(s).replace(/"/g, "&quot;");
+  sub.innerHTML = opts.length
+    ? opts.map(o => `<div class="ptItem" role="menuitem" tabindex="-1" data-value="${attr(o.value)}" title="${attr(o.textContent)}">${esc(o.textContent)}</div>`).join("")
+    : `<div class="ptEmpty">${esc(item.dataset.empty)}</div>`;
+}
+function ptRun(item, value) {
+  const btn = $(item.dataset.btn);
+  ptClose();
+  if (value === undefined) { btn.click(); return; }
+  const sel = $(item.dataset.sel);
+  // the pipeline picker is also the main toolbar's selection; put it back
+  // afterwards so a cancelled delete does not change what is on screen
+  const prev = sel.value;
+  sel.value = value;
+  sel.onchange && sel.onchange();
+  btn.click();             // confirm() runs synchronously inside the click
+  if (sel.id === "pipelist" && [...sel.options].some(o => o.value === prev)) {
+    sel.value = prev;
+    sel.onchange && sel.onchange();
+  }
+}
+$("ptBtn").onclick = e => { e.stopPropagation(); $("ptMenu").hidden ? ptOpen() : ptClose(); };
+$("ptMenu").addEventListener("click", e => {
+  e.stopPropagation();
+  const leaf = e.target.closest(".ptSub .ptItem");
+  if (leaf) return ptRun(leaf.closest(".ptSub").parentElement, leaf.dataset.value);
+  const top = e.target.closest("#ptMenu > .ptItem");
+  if (!top) return;
+  if (!top.dataset.sel) return ptRun(top);
+  // touch / click: toggle the flyout, since there is no hover to open it
+  const was = top.classList.contains("ptOpen");
+  $("ptMenu").querySelectorAll(".ptOpen").forEach(el => el.classList.remove("ptOpen"));
+  if (!was) top.classList.add("ptOpen");
+});
+// hovering a row closes whichever flyout a click left pinned open elsewhere
+$("ptMenu").addEventListener("mouseover", e => {
+  const top = e.target.closest("#ptMenu > .ptItem");
+  if (top) $("ptMenu").querySelectorAll(".ptOpen").forEach(el => el !== top && el.classList.remove("ptOpen"));
+});
+document.addEventListener("click", ptClose);
+document.addEventListener("keydown", e => { if (e.key === "Escape") ptClose(); });
 
 /* ================= Results panel (UX-3 / DM-1) =========================
    The outcome surface: how much, how fresh, did it work, what does it say.
@@ -4137,7 +4217,7 @@ async function renderSourcesTab() {
       `<option value="">&mdash; select a source &mdash;</option>` +
       list.map(s => `<option value="${esc(s.id)}">${esc(s.label)}</option>`).join("") +
     `</select></label>
-     <button class="s_add" style="font-family:Newsreader,serif;font-weight:700;font-size:.76rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:10px;padding:.32rem .7rem;cursor:pointer">+ Add Source</button>`,
+     <button class="s_add" style="font-family:var(--font);font-weight:700;font-size:.76rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:7px;padding:.32rem .7rem;cursor:pointer">+ Add Source</button>`,
     null);
   card.querySelector(".s_add").onclick = e => {
     e.preventDefault();
@@ -4358,8 +4438,8 @@ async function renderMlTab() {
         `${m.trained ? " &middot; trained" : ""}${m.validated ? " &middot; validated" : ""}` +
         `${m.timeSeries ? " &middot; time series" : ""}</option>`).join("") +
     `</select></label>
-     <button class="m_new" style="font-family:Newsreader,serif;font-weight:700;font-size:.76rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:10px;padding:.32rem .7rem;cursor:pointer">+ New model</button>
-     <button class="m_custom" style="font-family:Newsreader,serif;font-weight:700;font-size:.76rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:10px;padding:.32rem .7rem;cursor:pointer">Custom models...</button>`,
+     <button class="m_new" style="font-family:var(--font);font-weight:700;font-size:.76rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:7px;padding:.32rem .7rem;cursor:pointer">+ New model</button>
+     <button class="m_custom" style="font-family:var(--font);font-weight:700;font-size:.76rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:7px;padding:.32rem .7rem;cursor:pointer">Custom models...</button>`,
     null);
   card.querySelector(".m_new").onclick = e => { e.preventDefault(); mlStepCreate(); };
   card.querySelector(".m_custom").onclick = e => { e.preventDefault(); mlStepCustom(); };
@@ -4393,11 +4473,11 @@ async function mlStepExisting(m) {
     (trained ? "" : "It has not been trained yet, so validating and testing are not available " +
       "until it has been."), "", "mlexisting");
   const bstyle = (primary, on) =>
-    `font-family:Newsreader,serif;font-weight:700;font-size:.78rem;` +
+    `font-family:var(--font);font-weight:700;font-size:.78rem;` +
     `background:${on ? (primary ? "var(--teal-fill)" : "var(--card)") : "var(--card)"};` +
     `color:${on ? (primary ? "var(--on-teal)" : "var(--ink)") : "var(--ink-soft)"};` +
     `border:1.5px solid ${on ? (primary ? "var(--teal-fill)" : "var(--ink)") : "var(--rule)"};` +
-    `border-radius:10px;padding:.4rem .9rem;cursor:${on ? "pointer" : "not-allowed"};` +
+    `border-radius:7px;padding:.4rem .9rem;cursor:${on ? "pointer" : "not-allowed"};` +
     `${on ? "box-shadow:var(--shadow);" : "opacity:.55;"}`;
   const card = stepCard(
     `<div style="width:100%;font-size:.82rem">` +
@@ -4445,7 +4525,7 @@ async function mlStepCreate(preset) {
      <label class="m_bywrap" style="display:none">Time column <select class="m_by"></select></label>
      <div style="width:100%">
        <div style="font-variant:small-caps;letter-spacing:.12em;color:var(--ink-soft);font-size:.72rem;margin:.3rem 0 .15rem">predicting &mdash; columns</div>
-       <div class="m_targets" style="max-height:8.5rem;overflow:auto;border:1px solid var(--rule);border-radius:8px;padding:.35rem .5rem"></div>
+       <div class="m_targets" style="max-height:8.5rem;overflow:auto;border:1px solid var(--rule);border-radius:6px;padding:.35rem .5rem"></div>
      </div>
      <label style="width:100%" title="Restricts the model to these feature columns (the WITH clause). Leave blank to use every other column.">Features (WITH) <input class="m_with" style="width:100%" placeholder="optional: col1, col2 - blank uses all columns"></label>
      <label>Custom model <select class="m_cust"><option value="">(let AutoML choose)</option></select></label>
@@ -4759,7 +4839,7 @@ async function mlStepPredict() {
       // show the statement that produced the grid, so the step explains itself
       const sql = j.sql
         ? `<div style="font-family:ui-monospace,Consolas,monospace;font-size:.72rem;` +
-          `background:var(--wash-1);border:1px solid var(--rule);border-radius:8px;` +
+          `background:var(--wash-1);border:1px solid var(--rule);border-radius:6px;` +
           `padding:.4rem .55rem;margin:.3rem 0;overflow:auto">${esc(j.sql)}</div>`
         : "";
       // Same grid the transform step draws: renderPreviewTable() handles the
@@ -4821,11 +4901,11 @@ async function mlStepCustom() {
         `<td style="padding:.15rem .6rem .15rem 0;color:var(--ink-soft)">${esc(m.slug)}</td>` +
         `<td style="padding:.15rem .6rem .15rem 0;color:var(--ink-soft)">${esc(m.kind)}</td>` +
         `<td><button class="c_use" data-slug="${esc(m.slug)}" data-kind="${esc(m.kind)}" ` +
-        `style="font-family:Newsreader,serif;font-size:.72rem;background:var(--card);color:var(--ink);` +
-        `border:1.5px solid var(--rule);border-radius:8px;padding:.15rem .5rem;cursor:pointer">create model</button> ` +
+        `style="font-family:var(--font);font-size:.72rem;background:var(--card);color:var(--ink);` +
+        `border:1.5px solid var(--rule);border-radius:6px;padding:.15rem .5rem;cursor:pointer">create model</button> ` +
         `<button class="c_del" data-slug="${esc(m.slug)}" data-kind="${esc(m.kind)}" ` +
-        `style="font-family:Newsreader,serif;font-size:.72rem;background:var(--card);color:var(--danger,#a33);` +
-        `border:1.5px solid var(--rule);border-radius:8px;padding:.15rem .5rem;cursor:pointer">delete</button></td></tr>`).join("")
+        `style="font-family:var(--font);font-size:.72rem;background:var(--card);color:var(--danger,#a33);` +
+        `border:1.5px solid var(--rule);border-radius:6px;padding:.15rem .5rem;cursor:pointer">delete</button></td></tr>`).join("")
     : `<tr><td colspan="4"><i>no custom models installed</i></td></tr>`;
 
   const card = stepCard(
@@ -4878,7 +4958,7 @@ function mlStepUseCustom(model) {
     `<b>Custom model</b> picker on any later model you create.`);
   const card = stepCard(
     `<div class="w_details">Creating with <code>model_name: ${esc(model.modelName)}</code></div>
-     <button class="c_back" style="font-family:Newsreader,serif;font-weight:700;font-size:.76rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:10px;padding:.32rem .7rem;cursor:pointer">Back to custom models</button>`,
+     <button class="c_back" style="font-family:var(--font);font-weight:700;font-size:.76rem;background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:7px;padding:.32rem .7rem;cursor:pointer">Back to custom models</button>`,
     "Create a model with it", async () => {
       await mlStepCreate({ kind: model.kind, customSlug: model.slug });
     });
@@ -4992,9 +5072,9 @@ async function mcpCall(path, payload) {
 // user can type into.
 const escA = s => esc(s).replace(/"/g, "&quot;");
 
-const MCPBTN = "font-family:Newsreader,serif;font-weight:700;font-size:.74rem;" +
+const MCPBTN = "font-family:var(--font);font-weight:700;font-size:.74rem;" +
   "background:var(--card);color:var(--ink);border:1.5px solid var(--rule);" +
-  "border-radius:10px;padding:.32rem .7rem;cursor:pointer";
+  "border-radius:7px;padding:.32rem .7rem;cursor:pointer";
 
 async function renderMcpTab() {
   await ensureOpt();
@@ -5152,8 +5232,8 @@ function mcpSyncPublishLabel(card) {
 
 function mcpToolHtml(t, i) {
   const ta = "width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.72rem;" +
-    "background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:8px;padding:.35rem";
-  return `<div style="border:1.5px solid var(--rule);border-radius:12px;padding:.55rem .65rem">
+    "background:var(--card);color:var(--ink);border:1.5px solid var(--rule);border-radius:6px;padding:.35rem";
+  return `<div style="border:1.5px solid var(--rule);border-radius:8px;padding:.55rem .65rem">
     <label style="display:flex;gap:.4rem;align-items:baseline">
       <input type="checkbox" class="mcp_keep" data-i="${i}" checked>
       <input class="mcp_name" data-i="${i}" value="${escA(t.name)}" size="28"
@@ -5238,7 +5318,7 @@ function mcpStepConnect(res) {
       }
     }
   }, null, 2);
-  const pre = "background:var(--card);border:1.5px solid var(--rule);border-radius:8px;" +
+  const pre = "background:var(--card);border:1.5px solid var(--rule);border-radius:6px;" +
     "padding:.4rem;font-size:.7rem;overflow-x:auto;white-space:pre";
   const card = wmsg("formcard",
     `<div style="width:100%">
@@ -5354,9 +5434,9 @@ async function kgCall(path, payload) {
   return j;
 }
 
-const KGBTN = "font-family:Newsreader,serif;font-weight:700;font-size:.74rem;" +
+const KGBTN = "font-family:var(--font);font-weight:700;font-size:.74rem;" +
   "background:var(--card);color:var(--ink);border:1.5px solid var(--rule);" +
-  "border-radius:10px;padding:.32rem .7rem;cursor:pointer";
+  "border-radius:7px;padding:.32rem .7rem;cursor:pointer";
 
 /* The tab is a shell: a section switcher plus whichever section is active.
    Switching rebuilds #convo rather than caching both, because the two sections

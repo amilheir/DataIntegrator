@@ -43,6 +43,12 @@ COPY --chown="${ISC_PACKAGE_MGRUSER}:${ISC_PACKAGE_IRISGROUP}" ./src-iris /opt/i
 WORKDIR /opt/irisbuild
 USER irisowner
 
+# The durable-%SYS mount point must exist in the image, owned by irisowner. A
+# new named volume copies the ownership of the directory it mounts over; with
+# no directory there (src-iris/data is dockerignored) it comes up root-owned
+# and the durable-data init aborts on a fresh `docker compose up`.
+RUN mkdir -p /opt/irisbuild/data
+
 
 # IntegratedML AutoML provider. Without it CREATE MODEL succeeds but TRAIN MODEL
 # fails with "%ML Provider 'AutoML' is not available on this instance" — the

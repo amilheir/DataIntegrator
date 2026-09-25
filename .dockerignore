@@ -6,3 +6,7 @@ src-iris/iris-main.log
 postgres-init/
 webgateway/
 *.md
+src-iris/dropzone/
+src-iris/jdbc/
+src-iris/.venv/
+src-iris/startup.sh

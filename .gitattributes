@@ -1,0 +1,4 @@
+# Shell scripts run inside Linux containers from Windows bind mounts. With
+# core.autocrlf=true a checkout would give them CRLF endings and dash/bash then
+# fail with ": not found" / "Syntax error". Keep them LF everywhere.
+*.sh text eol=lf
