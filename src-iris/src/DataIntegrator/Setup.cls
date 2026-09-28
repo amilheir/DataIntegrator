@@ -33,13 +33,8 @@ ClassMethod ConfigureLocalProfile(baseUrl As %String = "http://host.docker.inter
 {
     Set sc = $$$OK
     Try {
-        Try {
-            Do ##class(%ConfigStore.Configuration).Delete("AI.LLM.DataIntegrator")
-        } Catch {
-            // no previous entry — fine
-        }
         Set config = {"model_provider": "nim", "model": (model), "base_url": (baseUrl)}
-        Do ##class(%ConfigStore.Configuration).Create("AI", "LLM", "", "DataIntegrator", config)
+        $$$ThrowOnError(##class(DataIntegrator.Agent.ProviderFactory).SaveProfile("DataIntegrator", config))
         If verbose {
             Write "AI.LLM.DataIntegrator -> nim @ ", baseUrl, " model=", model, !
         }
@@ -83,7 +78,7 @@ Parameter DEFAULTAGENTMODEL = "dataintegrator-gemma:latest";
 ClassMethod GetAgentModel() As %String
 {
     Try {
-        Set sc = ##class(%ConfigStore.Configuration).GetDetails("AI.LLM.DataIntegrator", .details, 0, 1)
+        Set sc = ##class(DataIntegrator.Agent.ProviderFactory).GetProfile("DataIntegrator", .details)
         If $$$ISERR(sc) {
             Return ""
         }
@@ -127,7 +122,7 @@ ClassMethod SetAgentModel(id As %String, Output error As %String) As %Boolean
         // Keep whatever base_url is already configured — a host-installed
         // Ollama uses host.docker.internal, the compose profile uses "ollama".
         Try {
-            Set sc = ##class(%ConfigStore.Configuration).GetDetails("AI.LLM.DataIntegrator", .details, 0, 1)
+            Set sc = ##class(DataIntegrator.Agent.ProviderFactory).GetProfile("DataIntegrator", .details)
             If $$$ISOK(sc), details."base_url" '= "" {
                 Set baseUrl = details."base_url"
             }
@@ -158,13 +153,8 @@ ClassMethod ConfigureCloudProfile(providerName As %String, model As %String, api
 {
     Set sc = $$$OK
     Try {
-        Try {
-            Do ##class(%ConfigStore.Configuration).Delete("AI.LLM.DataIntegrator")
-        } Catch {
-            // no previous entry — fine
-        }
         Set config = {"model_provider": (providerName), "model": (model), "api_key": (apiKeyRef)}
-        Do ##class(%ConfigStore.Configuration).Create("AI", "LLM", "", "DataIntegrator", config)
+        $$$ThrowOnError(##class(DataIntegrator.Agent.ProviderFactory).SaveProfile("DataIntegrator", config))
         Write "AI.LLM.DataIntegrator -> ", providerName, " model=", model, !
     } Catch ex {
         Set sc = ex.AsStatus()
@@ -191,12 +181,8 @@ ClassMethod ConfigureSqlGenProfile(model As %String = "dataintegrator-coder:late
 {
     Set sc = $$$OK
     Try {
-        Try {
-            Do ##class(%ConfigStore.Configuration).Delete("AI.LLM.DataIntegratorSqlGen")
-        } Catch {
-        }
         Set config = {"model_provider": "nim", "model": (model), "base_url": (baseUrl)}
-        Do ##class(%ConfigStore.Configuration).Create("AI", "LLM", "", "DataIntegratorSqlGen", config)
+        $$$ThrowOnError(##class(DataIntegrator.Agent.ProviderFactory).SaveProfile("DataIntegratorSqlGen", config))
         If verbose {
             Write "AI.LLM.DataIntegratorSqlGen -> ", model, " @ ", baseUrl, !
         }

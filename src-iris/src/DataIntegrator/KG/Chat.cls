@@ -588,11 +588,11 @@ ClassMethod AnswerStream(prompt As %String, askId As %String, cfg As %DynamicObj
 }
 
 /// Base URL and model for the chat profile, read from the same Config Store
-/// entry the agent path uses - one source of truth for where the LLM lives.
+/// profile the agent path uses - one source of truth for where the LLM lives.
 ClassMethod Endpoint(Output baseUrl As %String, Output model As %String) As %String [ Internal ]
 {
     Set baseUrl = "", model = ""
-    Set sc = ##class(%ConfigStore.Configuration).GetDetails("AI.LLM.DataIntegrator", .details, 0, 1)
+    Set sc = ##class(DataIntegrator.Agent.ProviderFactory).GetProfile("DataIntegrator", .details)
     If $$$ISERR(sc) {
         Return "no LLM profile (AI.LLM.DataIntegrator): " _ $System.Status.GetErrorText(sc)
     }
