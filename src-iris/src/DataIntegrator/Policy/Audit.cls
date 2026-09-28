@@ -6,7 +6,7 @@ Include %AI
 /// Hook contract verified on build 162: %LogExecution(call, metadata, result,
 /// duration, status) is called after every tool execution (success or error).
 /// Stateless by design (no instance properties).
-Class ETLWizard.Policy.Audit Extends %AI.Policy.Audit
+Class DataIntegrator.Policy.Audit Extends %AI.Policy.Audit
 {
 
 Method %LogExecution(call As %DynamicObject, metadata As %DynamicObject, result As %DynamicObject, duration As %Integer, status As %Status) As %Status
@@ -42,7 +42,7 @@ Method %LogExecution(call As %DynamicObject, metadata As %DynamicObject, result 
             }
             Set payload.result = summary
         }
-        Do ##class(ETLWizard.Model.Event).Append(runId, "tool.executed", "", payload)
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "tool.executed", "", payload)
     } Catch {
         // Auditing must never break tool execution
     }

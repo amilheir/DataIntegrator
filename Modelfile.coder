@@ -1,8 +1,8 @@
-# Model for the SQL agent and index advisor (AI.LLM.ETLWizardSqlGen), and a
-# candidate for the architect (AI.LLM.ETLWizard) as well.
+# Model for the SQL agent and index advisor (AI.LLM.DataIntegratorSqlGen), and a
+# candidate for the architect (AI.LLM.DataIntegrator) as well.
 #
-# Build with: ollama create etlwizard-coder -f Modelfile.coder
-#   docker exec irisetlwizard-ollama-1 ollama create etlwizard-coder -f /Modelfile.coder
+# Build with: ollama create dataintegrator-coder -f Modelfile.coder
+#   docker exec dataintegrator-ollama-1 ollama create dataintegrator-coder -f /Modelfile.coder
 #
 # Why this exists alongside Modelfile (qwen3.5:9b @ 8192):
 #
@@ -20,7 +20,7 @@
 # Measured on the index-advisor prompt (431 in, ~150 tokens is the whole answer):
 #   qwen2.5-coder:7b       148 out    12.7s   valid JSON
 #   gemma4:e4b-it-q4_K_M  1503 out    56.3s   JSON buried in markdown prose
-#   etlwizard-qwen        3072 out   3m35s    ran to the cap, never emitted JSON
+#   dataintegrator-qwen        3072 out   3m35s    ran to the cap, never emitted JSON
 # Wall-clock here is driven by how much the model writes, not tokens/sec -
 # gemma4 is the fastest per token of the three and still the slowest overall.
 

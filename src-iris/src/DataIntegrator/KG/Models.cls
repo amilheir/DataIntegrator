@@ -11,7 +11,7 @@ Include %occStatus
 /// answers an order of magnitude slower. Measured here: gemma4:e4b sits fully
 /// on the GPU and still took 204 s on an extraction the coder did in 40 s, so
 /// even "fits" is not a promise of speed. Fit is necessary, not sufficient.
-Class ETLWizard.KG.Models Extends %RegisteredObject
+Class DataIntegrator.KG.Models Extends %RegisteredObject
 {
 
 /// Usable VRAM on this machine, in bytes. Measured: an 8,188 MiB card with the
@@ -22,7 +22,7 @@ Parameter USABLEVRAM = 8375000000;
 ClassMethod List() As %DynamicObject
 {
     Try {
-        Set err = ##class(ETLWizard.KG.Setup).EmbedEndpoint(.baseUrl, .embedModel)
+        Set err = ##class(DataIntegrator.KG.Setup).EmbedEndpoint(.baseUrl, .embedModel)
         If err '= "" {
             Return {"error": (err)}
         }
@@ -54,18 +54,18 @@ ClassMethod List() As %DynamicObject
                 Set vram = $Get(resident(key), 0)
                 Do out.%Push({
                     "id": (name),
-                    "sizeGB": (##class(ETLWizard.KG.Setup).Round(diskSize / 1000000000, 2)),
-                    "residentGB": ($Select(isResident: ##class(ETLWizard.KG.Setup).Round(vram / 1000000000, 2), 1: "")),
+                    "sizeGB": (##class(DataIntegrator.KG.Setup).Round(diskSize / 1000000000, 2)),
+                    "residentGB": ($Select(isResident: ##class(DataIntegrator.KG.Setup).Round(vram / 1000000000, 2), 1: "")),
                     "loaded": (''isResident),
                     "note": (..Note(name, diskSize, isResident, vram, free))})
             }
         }
         Return {"models": (out),
-                "chatModel": (##class(ETLWizard.KG.Setup).GetChatModel()),
-                "extractModel": (##class(ETLWizard.KG.Setup).GetExtractModel()),
+                "chatModel": (##class(DataIntegrator.KG.Setup).GetChatModel()),
+                "extractModel": (##class(DataIntegrator.KG.Setup).GetExtractModel()),
                 "embedModel": (embedModel),
-                "usedVramGB": (##class(ETLWizard.KG.Setup).Round(usedVram / 1000000000, 2)),
-                "usableVramGB": (##class(ETLWizard.KG.Setup).Round(..#USABLEVRAM / 1000000000, 2))}
+                "usedVramGB": (##class(DataIntegrator.KG.Setup).Round(usedVram / 1000000000, 2)),
+                "usableVramGB": (##class(DataIntegrator.KG.Setup).Round(..#USABLEVRAM / 1000000000, 2))}
     } Catch ex {
         Return {"error": (ex.DisplayString())}
     }
@@ -84,15 +84,15 @@ ClassMethod Note(name As %String, diskSize As %Integer, isResident As %Boolean, 
         If vram = 0 {
             Return "loaded, running on CPU - slow"
         }
-        Return "loaded, " _ ##class(ETLWizard.KG.Setup).Round(vram / 1000000000, 2) _ " GB on GPU"
+        Return "loaded, " _ ##class(DataIntegrator.KG.Setup).Round(vram / 1000000000, 2) _ " GB on GPU"
     }
     If diskSize < free {
-        Return "not loaded - should fit in the " _ ##class(ETLWizard.KG.Setup).Round(free / 1000000000, 1) _ " GB free"
+        Return "not loaded - should fit in the " _ ##class(DataIntegrator.KG.Setup).Round(free / 1000000000, 1) _ " GB free"
     }
     // File size over free VRAM is a WARNING, not a verdict: gemma4:e4b is
     // 9.61 GB on disk and runs in 3.23 GB.
-    Return "not loaded - " _ ##class(ETLWizard.KG.Setup).Round(diskSize / 1000000000, 1) _
-        " GB on disk against " _ ##class(ETLWizard.KG.Setup).Round(free / 1000000000, 1) _ " GB free; load it to see the real cost"
+    Return "not loaded - " _ ##class(DataIntegrator.KG.Setup).Round(diskSize / 1000000000, 1) _
+        " GB on disk against " _ ##class(DataIntegrator.KG.Setup).Round(free / 1000000000, 1) _ " GB free; load it to see the real cost"
 }
 
 /// GET a JSON endpoint on the Ollama host.

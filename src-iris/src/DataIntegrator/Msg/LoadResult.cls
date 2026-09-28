@@ -1,5 +1,5 @@
 /// Typed response from the load operation (spec §4.3).
-Class ETLWizard.Msg.LoadResult Extends Ens.Response
+Class DataIntegrator.Msg.LoadResult Extends Ens.Response
 {
 
 Property Ok As %Boolean [ InitialExpression = 0 ];

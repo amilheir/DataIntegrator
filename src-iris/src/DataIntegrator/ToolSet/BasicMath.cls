@@ -1,7 +1,7 @@
 /// Basic Math ToolSet
 /// Demonstrates composing math tools into a reusable toolset
 /// General-purpose toolset usable in any tool-based integration
-Class ETLWizard.ToolSet.BasicMath Extends %AI.ToolSet [ DependsOn = ETLWizard.ToolSet.Tools.Math ]
+Class DataIntegrator.ToolSet.BasicMath Extends %AI.ToolSet [ DependsOn = DataIntegrator.ToolSet.Tools.Math ]
 {
   XData Definition [ MimeType = application/xml ]
   {
@@ -15,7 +15,7 @@ Class ETLWizard.ToolSet.BasicMath Extends %AI.ToolSet [ DependsOn = ETLWizard.To
              DatabaseAudit example in the ObjectScript SDK guide. -->
 
       <!-- Include Math tools -->
-      <Include Class="ETLWizard.ToolSet.Tools.Math" />
+      <Include Class="DataIntegrator.ToolSet.Tools.Math" />
 
     </ToolSet>
   }

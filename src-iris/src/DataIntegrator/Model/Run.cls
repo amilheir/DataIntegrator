@@ -1,8 +1,8 @@
 /// One execution of a pipeline — wizard-driven, manual, or scheduled (spec §12.1).
-Class ETLWizard.Model.Run Extends %Persistent
+Class DataIntegrator.Model.Run Extends %Persistent
 {
 
-Property Pipeline As ETLWizard.Model.Pipeline [ Required ];
+Property Pipeline As DataIntegrator.Model.Pipeline [ Required ];
 
 Property StartedAt As %TimeStamp [ InitialExpression = {$ZDateTime($ZTimeStamp, 3, , 3)} ];
 

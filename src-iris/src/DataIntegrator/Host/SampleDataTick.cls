@@ -1,8 +1,8 @@
 /// Clock for the sample-data feed. A Business Operation only runs when a
 /// message arrives, so the "every minute" part lives here: an adapterless poll
 /// service whose CallInterval fires once a minute and sends one request to
-/// ETLWizard.Host.SampleDataOperation.
-Class ETLWizard.Host.SampleDataTick Extends Ens.BusinessService
+/// DataIntegrator.Host.SampleDataOperation.
+Class DataIntegrator.Host.SampleDataTick Extends Ens.BusinessService
 {
 
 Parameter ADAPTER = "Ens.InboundAdapter";

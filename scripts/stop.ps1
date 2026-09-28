@@ -1,4 +1,4 @@
-# Graceful shutdown for the ETL Wizard stack - PowerShell equivalent of stop.sh
+# Graceful shutdown for the Data Integrator stack - PowerShell equivalent of stop.sh
 # (IMPROVEMENTS_SPEC PR-2). The primary environment is Windows; stop.sh is sh.
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\stop.ps1
@@ -23,7 +23,7 @@
 # SIGUSR1/SIGUSR2), so a longer grace period just delays the same SIGKILL.
 
 param(
-    [string]$Container = "irisetlwizard-iris-1",
+    [string]$Container = "dataintegrator-iris-1",
     [string[]]$ComposeArgs = @()
 )
 

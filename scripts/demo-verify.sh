@@ -10,12 +10,12 @@
 # Exit code is the number of failures, so `if sh demo-verify.sh; then` works.
 # Each failure prints ONE actionable line - never a stack trace.
 
-IRIS_C="${IRIS_C:-irisetlwizard-iris-1}"
-PG_C="${PG_C:-irisetlwizard-postgres-1}"
-OLLAMA_C="${OLLAMA_C:-irisetlwizard-ollama-1}"
+IRIS_C="${IRIS_C:-dataintegrator-iris-1}"
+PG_C="${PG_C:-dataintegrator-postgres-1}"
+OLLAMA_C="${OLLAMA_C:-dataintegrator-ollama-1}"
 BASE="${BASE:-http://localhost:52773}"
 AUTH="${AUTH:-_SYSTEM:SYS}"
-NS="${NS:-ETLWIZARD}"
+NS="${NS:-DATAINTEGRATOR}"
 # Executive is the shipped default: the instance opens on the opening card for
 # a business audience. Override for an engineering session: VIEW=technical ...
 WANT_VIEW="${VIEW:-executive}"
@@ -28,11 +28,11 @@ pass() { printf '  ok    %s\n' "$1"; }
 fail() { printf '  FAIL  %s\n' "$1"; printf '        -> %s\n' "$2"; FAILS=$((FAILS + 1)); }
 warn() { printf '  warn  %s\n' "$1"; }
 
-api() { curl -s -u "$AUTH" --max-time 15 "$BASE/etlwizard/api$1"; }
+api() { curl -s -u "$AUTH" --max-time 15 "$BASE/dataintegrator/api$1"; }
 irisrun() { docker exec -i "$IRIS_C" iris session IRIS -U "$NS" 2>/dev/null; }
 psql() { docker exec -i "$PG_C" psql -U crm -d crm -A -t -q -c "$1" 2>/dev/null; }
 
-echo "== ETL Wizard demo readiness"
+echo "== Data Integrator demo readiness"
 echo
 
 # ---------------------------------------------------------------- 1  IRIS up
@@ -75,9 +75,9 @@ else
 fi
 
 # ------------------------------------------------------- 2  Web Gateway page
-CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 -u "$AUTH" "$BASE/etlwizard/index.html")
+CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 -u "$AUTH" "$BASE/dataintegrator/index.html")
 if [ "$CODE" = "200" ]; then
-    pass "Web Gateway serves /etlwizard/index.html"
+    pass "Web Gateway serves /dataintegrator/index.html"
 else
     fail "the UI page returned HTTP $CODE" "check the webgateway container: docker compose logs webgateway"
 fi
@@ -86,7 +86,7 @@ fi
 if api /ping | grep -q '"status":"ok"'; then
     pass "REST dispatcher answers /ping"
 else
-    fail "GET /etlwizard/api/ping did not answer ok" "check the licence key and the CSP application: docker logs $IRIS_C"
+    fail "GET /dataintegrator/api/ping did not answer ok" "check the licence key and the CSP application: docker logs $IRIS_C"
 fi
 
 # ------------------------------------------------- 4  PostgreSQL up + seeded
@@ -131,7 +131,7 @@ fi
 # ------------------------------------------- 7  Ollama up, resident, warm
 if docker ps --format '{{.Names}}' | grep -qx "$OLLAMA_C"; then
     MODEL=$(printf '%s' "$(api /models)" | sed -n 's/.*"active":"\([^"]*\)".*/\1/p')
-    MODEL=${MODEL:-etlwizard-coder:latest}
+    MODEL=${MODEL:-dataintegrator-coder:latest}
     START=$(date +%s)
     OUT=$(docker exec -i "$OLLAMA_C" ollama run "$MODEL" "reply with the single word ready" 2>/dev/null)
     ELAPSED=$(( $(date +%s) - START ))
@@ -168,7 +168,7 @@ else
 fi
 
 # ------------------------------------------- 8/9/10  governance + view
-CFG=$(printf 'do ##class(ETLWizard.Setup).PrintDemoConfig()\nhalt\n' | irisrun | tr -d '\r' | grep '^{')
+CFG=$(printf 'do ##class(DataIntegrator.Setup).PrintDemoConfig()\nhalt\n' | irisrun | tr -d '\r' | grep '^{')
 DEV=$(printf '%s' "$CFG" | sed -n 's/.*"devMode":\([0-9]*\).*/\1/p')
 TMO=$(printf '%s' "$CFG" | sed -n 's/.*"approvalTimeoutSecs":\([0-9]*\).*/\1/p')
 DVIEW=$(printf '%s' "$CFG" | sed -n 's/.*"defaultView":"\([a-z]*\)".*/\1/p')
@@ -177,21 +177,21 @@ if [ "$DEV" = "0" ]; then
     pass "approvals enforced (devMode=0)"
 else
     fail "approvals are NOT enforced (devMode=${DEV:-unset})" \
-         "the governance claim is not true in this state. Fix: do ##class(ETLWizard.Setup).EnableApprovals(900)"
+         "the governance claim is not true in this state. Fix: do ##class(DataIntegrator.Setup).EnableApprovals(900)"
 fi
 if [ "${TMO:-0}" -ge 900 ]; then
     pass "approval timeout ${TMO}s (survives a question from the audience)"
 else
     fail "approval timeout is ${TMO:-300}s" \
-         "a 5-minute timeout expires mid-demo. Fix: do ##class(ETLWizard.Setup).EnableApprovals(900)"
+         "a 5-minute timeout expires mid-demo. Fix: do ##class(DataIntegrator.Setup).EnableApprovals(900)"
 fi
 APPROVERS=$(printf '%s' "$CFG" | sed -n 's/.*"approverAccounts":\([0-9]*\).*/\1/p')
 MATCHROLES=$(printf '%s' "$CFG" | sed -n 's/.*"appMatchRoles":"\([^"]*\)".*/\1/p')
 if [ "${APPROVERS:-0}" -ge 1 ]; then
-    pass "$APPROVERS account(s) hold ETLWizard_Approver"
+    pass "$APPROVERS account(s) hold DataIntegrator_Approver"
 else
-    fail "no account holds ETLWizard_Approver" \
-         "an approval card would have nobody who can resolve it. Fix: do ##class(ETLWizard.Setup).CreateDemoUsers(\"<password>\")"
+    fail "no account holds DataIntegrator_Approver" \
+         "an approval card would have nobody who can resolve it. Fix: do ##class(DataIntegrator.Setup).CreateDemoUsers(\"<password>\")"
 fi
 # The web applications are installed with MatchRoles=":%All", so every request -
 # authenticated or not - already holds every privilege. That is why the approval
@@ -207,7 +207,7 @@ if [ "$DVIEW" = "$WANT_VIEW" ]; then
     pass "default view is $DVIEW"
 else
     fail "default view is ${DVIEW:-unset}, expected $WANT_VIEW" \
-         "do ##class(ETLWizard.Setup).SetDefaultView(\"$WANT_VIEW\")"
+         "do ##class(DataIntegrator.Setup).SetDefaultView(\"$WANT_VIEW\")"
 fi
 
 # ------------------------------------------- 11/12  ML preconditions
@@ -241,11 +241,11 @@ if [ "${ML:-0}" = "1" ]; then
             pass "demo model order_completion_risk is pre-trained"
         else
             fail "order_completion_risk exists but is NOT trained" \
-                 "train it before the demo, never during it: POST /ml/train {\"name\":\"order_completion_risk\",\"table\":\"ETLWIZARD.ext_daily_sales\"}"
+                 "train it before the demo, never during it: POST /ml/train {\"name\":\"order_completion_risk\",\"table\":\"DATAINTEGRATOR.ext_daily_sales\"}"
         fi
     else
         fail "the demo model order_completion_risk does not exist" \
-             "create and train it on ETLWIZARD.ext_daily_sales predicting 'outcome' - see DEMO_RUNBOOK section 3.5"
+             "create and train it on DATAINTEGRATOR.ext_daily_sales predicting 'outcome' - see DEMO_RUNBOOK section 3.5"
     fi
     # the picker is on screen in Step 9; anything else in it is clutter
     NMODELS=$(printf '%s' "$MODELS" | tr ',' '\n' | grep -c '"name"')

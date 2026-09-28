@@ -1,9 +1,9 @@
 /// Bridge between the REST layer and the agent: one wizard chat turn.
-/// Keeps all %AI.* calls out of ETLWizard.API (spec §4.1 EAP caveat).
-Class ETLWizard.Agent.Service Extends %RegisteredObject
+/// Keeps all %AI.* calls out of DataIntegrator.API (spec §4.1 EAP caveat).
+Class DataIntegrator.Agent.Service Extends %RegisteredObject
 {
 
-/// Streaming defaults. Overridden per instance through ^ETLWizard.Agent -
+/// Streaming defaults. Overridden per instance through ^DataIntegrator.Agent -
 /// see SetStreamConfig() - so it can be turned off, or retuned, without a
 /// code change or a recompile.
 Parameter STREAMDEFAULT = 1;
@@ -29,15 +29,15 @@ ClassMethod ChatTurn(runId As %String, text As %String) As %Status
     Try {
         // The user's own note carries the Seq that identifies this turn: the
         // deltas quote it, and the client uses it to put them in one place.
-        Do ##class(ETLWizard.Model.Event).Append(runId, "agent.note", "",
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "agent.note", "",
             {"role": "user", "text": (text)}, .turn)
 
-        Set agent = ##class(ETLWizard.Agent.Architect).%New()
+        Set agent = ##class(DataIntegrator.Agent.Architect).%New()
         Set sc = agent.%Init()
         If $$$ISERR(sc) {
-            Do ##class(ETLWizard.Model.Event).Append(runId, "run.error", "",
+            Do ##class(DataIntegrator.Model.Event).Append(runId, "run.error", "",
                 {"error": ("agent init failed: " _ $System.Status.GetErrorText(sc)),
-                 "hint": "Run ##class(ETLWizard.Setup).ConfigureLocalProfile() or ConfigureCloudProfile() first"})
+                 "hint": "Run ##class(DataIntegrator.Setup).ConfigureLocalProfile() or ConfigureCloudProfile() first"})
             Return sc
         }
 
@@ -48,7 +48,7 @@ ClassMethod ChatTurn(runId As %String, text As %String) As %Status
         Set cfg = ..StreamConfig()
         Set sink = $$$NULLOREF
         If cfg.enabled {
-            Set sink = ##class(ETLWizard.Agent.StreamSink).%New()
+            Set sink = ##class(DataIntegrator.Agent.StreamSink).%New()
             Do sink.Start(runId, turn, cfg.minChars, cfg.minMs)
             Set response = agent.StreamChat(session, prompt, sink, "OnChunk")
             Do sink.Finish()
@@ -67,10 +67,10 @@ ClassMethod ChatTurn(runId As %String, text As %String) As %Status
         If $IsObject(sink) {
             Set note.stream = sink.Stats()
         }
-        Do ##class(ETLWizard.Model.Event).Append(runId, "agent.note", "", note)
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "agent.note", "", note)
     } Catch ex {
         Set sc = ex.AsStatus()
-        Do ##class(ETLWizard.Model.Event).Append(runId, "run.error", "",
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "run.error", "",
             {"error": ($System.Status.GetErrorText(sc))})
     }
     Return sc
@@ -79,24 +79,24 @@ ClassMethod ChatTurn(runId As %String, text As %String) As %Status
 /// Current streaming settings.
 ClassMethod StreamConfig() As %DynamicObject
 {
-    Set enabled = $Get(^ETLWizard.Agent("stream", "enabled"), ..#STREAMDEFAULT)
-    Set minChars = +$Get(^ETLWizard.Agent("stream", "minChars"), ..#MINCHARSDEFAULT)
-    Set minMs = +$Get(^ETLWizard.Agent("stream", "minMs"), ..#MINMSDEFAULT)
+    Set enabled = $Get(^DataIntegrator.Agent("stream", "enabled"), ..#STREAMDEFAULT)
+    Set minChars = +$Get(^DataIntegrator.Agent("stream", "minChars"), ..#MINCHARSDEFAULT)
+    Set minMs = +$Get(^DataIntegrator.Agent("stream", "minMs"), ..#MINMSDEFAULT)
     Return {"enabled": (''enabled), "minChars": ($Select(minChars < 1: 1, 1: minChars)),
             "minMs": ($Select(minMs < 0: 0, 1: minMs))}
 }
 
 /// Turn streaming on or off and retune the batching, at runtime.
-///   Do ##class(ETLWizard.Agent.Service).SetStreamConfig(0)          // off
-///   Do ##class(ETLWizard.Agent.Service).SetStreamConfig(1, 48, 400) // coarser
+///   Do ##class(DataIntegrator.Agent.Service).SetStreamConfig(0)          // off
+///   Do ##class(DataIntegrator.Agent.Service).SetStreamConfig(1, 48, 400) // coarser
 ClassMethod SetStreamConfig(enabled As %Boolean = 1, minChars As %Integer = "", minMs As %Integer = "") As %DynamicObject
 {
-    Set ^ETLWizard.Agent("stream", "enabled") = ''enabled
+    Set ^DataIntegrator.Agent("stream", "enabled") = ''enabled
     If minChars '= "" {
-        Set ^ETLWizard.Agent("stream", "minChars") = +minChars
+        Set ^DataIntegrator.Agent("stream", "minChars") = +minChars
     }
     If minMs '= "" {
-        Set ^ETLWizard.Agent("stream", "minMs") = +minMs
+        Set ^DataIntegrator.Agent("stream", "minMs") = +minMs
     }
     Return ..StreamConfig()
 }

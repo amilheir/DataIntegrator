@@ -1,6 +1,6 @@
 /// Wizard / pipeline / run REST endpoints (spec §15).
-/// Served at /etlwizard/api (see Installer.cls).
-Class ETLWizard.API.Dispatcher Extends %CSP.REST
+/// Served at /dataintegrator/api (see Installer.cls).
+Class DataIntegrator.API.Dispatcher Extends %CSP.REST
 {
 
 Parameter HandleCorsRequest = 1;
@@ -149,7 +149,7 @@ ClassMethod ExplainError(raw As %String) As %String [ Internal ]
         Return "Rows with that key are already in the target. An append-only load re-inserts every row each run: a recomputed result wants Merge/Upsert or Full reload instead."
     }
     If code = -400 {
-        Return "The database rejected that statement. If a schema name was involved, note that any name beginning ETLWIZARD conflicts with the code package - the layer schemas are ETLW_LANDING, ETLW_STAGING and ETLW_TARGET."
+        Return "The database rejected that statement. If a schema name was involved, note that any name beginning DATAINTEGRATOR conflicts with the code package - the layer schemas are ETLW_LANDING, ETLW_STAGING and ETLW_TARGET."
     }
     If code = -30 {
         Return "That table or view does not exist. It may have been dropped, or the name may be misspelled."
@@ -160,10 +160,10 @@ ClassMethod ExplainError(raw As %String) As %String [ Internal ]
 
     // --- language-independent: names that never translate ---------------
     If (t [ "%gateway_object") || (t [ "gateway_object:use") {
-        Return "This account is not allowed to reach external databases. It needs the %Gateway_Object:USE privilege (role ETLWizard_Admin)."
+        Return "This account is not allowed to reach external databases. It needs the %Gateway_Object:USE privilege (role DataIntegrator_Admin)."
     }
-    If (t [ "etlwizard.approve") || (t [ "lacks etlwizard.approve") {
-        Return "This account cannot approve changes. Approvals require the ETLWizard_Approver role - sign in as the approver, or ask them to resolve the card."
+    If (t [ "dataintegrator.approve") || (t [ "lacks dataintegrator.approve") {
+        Return "This account cannot approve changes. Approvals require the DataIntegrator_Approver role - sign in as the approver, or ask them to resolve the card."
     }
     If (t [ "no suitable driver") || (t [ "classnotfound") {
         Return "The JDBC driver for that database is not installed. Drop the driver jar into src-iris/jdbc and give its path on the connection."
@@ -281,7 +281,7 @@ ClassMethod StartWizardSession() As %Status
             Set name = "pipeline-" _ $Translate($ZDateTime($ZTimeStamp, 3), " :", "-")
         }
 
-        Set pipeline = ##class(ETLWizard.Model.Pipeline).%New()
+        Set pipeline = ##class(DataIntegrator.Model.Pipeline).%New()
         Set pipeline.Name = name
         Set pipeline.Description = description
         Set pipeline.Owner = owner
@@ -290,7 +290,7 @@ ClassMethod StartWizardSession() As %Status
             Return ..WriteError($System.Status.GetErrorText(sc), "400 Bad Request")
         }
 
-        Set run = ##class(ETLWizard.Model.Run).%New()
+        Set run = ##class(DataIntegrator.Model.Run).%New()
         Set run.Pipeline = pipeline
         Set run.Trigger = "wizard"
         Set sc = run.%Save()
@@ -298,7 +298,7 @@ ClassMethod StartWizardSession() As %Status
             Return ..WriteError($System.Status.GetErrorText(sc))
         }
 
-        Set sc = ##class(ETLWizard.Model.Event).Append(run.%Id(), "run.started", "",
+        Set sc = ##class(DataIntegrator.Model.Event).Append(run.%Id(), "run.started", "",
             {"pipelineId": (pipeline.%Id()), "pipelineName": (name), "trigger": "wizard"})
         If $$$ISERR(sc) {
             Return ..WriteError($System.Status.GetErrorText(sc))
@@ -314,7 +314,7 @@ ClassMethod StartWizardSession() As %Status
 ClassMethod PostMessage(runId As %String) As %Status
 {
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return ..WriteError("run not found: " _ runId, "404 Not Found")
         }
@@ -326,7 +326,7 @@ ClassMethod PostMessage(runId As %String) As %Status
         If text = "" {
             Return ..WriteError("body must be {""text"": ""...""}", "400 Bad Request")
         }
-        Set sc = ##class(ETLWizard.Agent.Service).ChatTurn(runId, text)
+        Set sc = ##class(DataIntegrator.Agent.Service).ChatTurn(runId, text)
         If $$$ISERR(sc) {
             // Error is already recorded as a run.error event; report it to the caller too
             Return ..WriteJSON({"ok": false, "error": ($System.Status.GetErrorText(sc))})
@@ -341,7 +341,7 @@ ClassMethod PostMessage(runId As %String) As %Status
 ClassMethod ResolveApproval(runId As %String, approvalId As %String) As %Status
 {
     Try {
-        Set approval = ##class(ETLWizard.Model.PendingApproval).%OpenId(approvalId)
+        Set approval = ##class(DataIntegrator.Model.PendingApproval).%OpenId(approvalId)
         If '$IsObject(approval) {
             Return ..WriteError("approval not found: " _ approvalId, "404 Not Found")
         }
@@ -351,16 +351,16 @@ ClassMethod ResolveApproval(runId As %String, approvalId As %String) As %Status
         If approval.Status '= "pending" {
             Return ..WriteError("approval already resolved: " _ approval.Status, "409 Conflict")
         }
-        // RBAC (spec §16.1): resolving approvals requires the ETLWizard_Approver
-        // role unless dev mode is on (^ETLWizard("devMode") = 1, the shipped
+        // RBAC (spec §16.1): resolving approvals requires the DataIntegrator_Approver
+        // role unless dev mode is on (^DataIntegrator("devMode") = 1, the shipped
         // default).
         //
         // This asks Policy.Auth.CanApprove(), NOT $SYSTEM.Security.Check() —
         // the privilege check is defeated by the web application's
         // MatchRoles=":%All", which hands every request %All. See the doc
         // comment on CanApprove for the verified failure.
-        If '+$Get(^ETLWizard("devMode"), 1) {
-            If '##class(ETLWizard.Policy.Auth).CanApprove(.why) {
+        If '+$Get(^DataIntegrator("devMode"), 1) {
+            If '##class(DataIntegrator.Policy.Auth).CanApprove(.why) {
                 Return ..WriteError("Approval refused: " _ why _ ".", "403 Forbidden")
             }
         }
@@ -379,7 +379,7 @@ ClassMethod ResolveApproval(runId As %String, approvalId As %String) As %Status
         If $$$ISERR(sc) {
             Return ..WriteError($System.Status.GetErrorText(sc))
         }
-        Set sc = ##class(ETLWizard.Model.Event).Append(runId, "approval.resolved", "",
+        Set sc = ##class(DataIntegrator.Model.Event).Append(runId, "approval.resolved", "",
             {"approvalId": (approvalId), "status": (approval.Status), "comment": (comment)})
         If $$$ISERR(sc) {
             Return ..WriteError($System.Status.GetErrorText(sc))
@@ -394,7 +394,7 @@ ClassMethod ResolveApproval(runId As %String, approvalId As %String) As %Status
 ClassMethod GetEvents(runId As %String) As %Status
 {
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return ..WriteError("run not found: " _ runId, "404 Not Found")
         }
@@ -408,7 +408,7 @@ ClassMethod GetEvents(runId As %String) As %Status
         Set withDeltas = +$Get(%request.Data("deltas", 1), 0)
         Set events = []
         Set stmt = ##class(%SQL.Statement).%New()
-        Set sc = stmt.%Prepare("SELECT ID FROM ETLWizard_Model.Event WHERE Run = ? AND Seq > ? " _
+        Set sc = stmt.%Prepare("SELECT ID FROM DataIntegrator_Model.Event WHERE Run = ? AND Seq > ? " _
             $Select(withDeltas: "", 1: "AND Type <> 'agent.delta' ") _ "ORDER BY Seq")
         If $$$ISERR(sc) {
             Return ..WriteError($System.Status.GetErrorText(sc))
@@ -418,7 +418,7 @@ ClassMethod GetEvents(runId As %String) As %Status
             Return ..WriteError("SQLCODE " _ rs.%SQLCODE _ ": " _ rs.%Message)
         }
         While rs.%Next() {
-            Set ev = ##class(ETLWizard.Model.Event).%OpenId(rs.ID)
+            Set ev = ##class(DataIntegrator.Model.Event).%OpenId(rs.ID)
             If '$IsObject(ev) {
                 Continue
             }
@@ -434,27 +434,27 @@ ClassMethod GetEvents(runId As %String) As %Status
 /// listed or dropped through the API, whatever a caller asks for.
 ClassMethod DataSchemas() As %List [ Internal ]
 {
-    Return $ListBuild("ETLW_LANDING", "ETLW_STAGING", "ETLW_TARGET", "ETLWIZARD")
+    Return $ListBuild("ETLW_LANDING", "ETLW_STAGING", "ETLW_TARGET", "DATAINTEGRATOR")
 }
 
 /// Every table the wizard built: the landing/staging/target tables it owns
-/// outright, plus the mounted sources in ETLWIZARD (foreign tables and
+/// outright, plus the mounted sources in DATAINTEGRATOR (foreign tables and
 /// ODBC-linked views). Row counts only for local tables — counting a foreign
 /// table would hit the remote source just to draw a dropdown.
 ClassMethod ListDataTables() As %Status
 {
     Try {
-        // which ETLWIZARD names are foreign tables, so each row can say what it is
+        // which DATAINTEGRATOR names are foreign tables, so each row can say what it is
         Set foreign = ","
         Set fr = ##class(%SQL.Statement).%ExecDirect(,
-            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.FOREIGN_TABLES WHERE TABLE_SCHEMA = 'ETLWIZARD'")
+            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.FOREIGN_TABLES WHERE TABLE_SCHEMA = 'DATAINTEGRATOR'")
         While fr.%Next() {
             Set foreign = foreign _ $ZConvert(fr.%GetData(1), "U") _ ","
         }
         Set list = []
         Set rs = ##class(%SQL.Statement).%ExecDirect(,
             "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES " _
-            "WHERE TABLE_SCHEMA IN ('ETLW_LANDING','ETLW_STAGING','ETLW_TARGET','ETLWIZARD') " _
+            "WHERE TABLE_SCHEMA IN ('ETLW_LANDING','ETLW_STAGING','ETLW_TARGET','DATAINTEGRATOR') " _
             "ORDER BY TABLE_SCHEMA, TABLE_NAME")
         While rs.%Next() {
             Set schema = rs.%GetData(1), name = rs.%GetData(2), type = rs.%GetData(3)
@@ -465,8 +465,8 @@ ClassMethod ListDataTables() As %Status
                 "ETLW_TARGET": "target",
                 : $Select(isForeign: "foreign table", $ZConvert(type, "U") = "VIEW": "linked view", 1: "table"))
             Set rows = ""
-            If schema '= "ETLWIZARD" {
-                Set rows = ##class(ETLWizard.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ schema _ "." _ name)
+            If schema '= "DATAINTEGRATOR" {
+                Set rows = ##class(DataIntegrator.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ schema _ "." _ name)
                 If $Extract(rows, 1, 5) = "ERROR" {
                     Set rows = ""
                 }
@@ -495,10 +495,10 @@ ClassMethod DropDataTable() As %Status
         If $ListFind(..DataSchemas(), schema) = 0 {
             Return ..WriteError("refusing to drop outside the wizard's own schemas", "400 Bad Request")
         }
-        If '##class(ETLWizard.Tools.Util).ValidIdent(name) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(name) {
             Return ..WriteError("invalid table name", "400 Bad Request")
         }
-        Set type = ##class(ETLWizard.Tools.Util).ScalarQuery(
+        Set type = ##class(DataIntegrator.Tools.Util).ScalarQuery(
             "SELECT TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?",
             schema, name)
         If ($Extract(type, 1, 5) = "ERROR") || (type = "") {
@@ -523,7 +523,7 @@ ClassMethod ListPipelines() As %Status
         // deploys or runs — keep it out of the picker
         Set rs = ##class(%SQL.Statement).%ExecDirect(,
             "SELECT ID, Name, Status, CreatedAt, CASE WHEN MetadataJson IS NULL THEN 0 ELSE 1 END AS deployed " _
-            "FROM ETLWizard_Model.Pipeline WHERE Name <> '" _ ..#SOURCESPIPELINE _ "' ORDER BY ID DESC")
+            "FROM DataIntegrator_Model.Pipeline WHERE Name <> '" _ ..#SOURCESPIPELINE _ "' ORDER BY ID DESC")
         While rs.%Next() {
             Do list.%Push({"id": (rs.%GetData(1)), "name": (rs.%GetData(2)), "status": (rs.%GetData(3)),
                            "createdAt": (rs.%GetData(4)), "deployed": (+rs.%GetData(5))})
@@ -553,14 +553,14 @@ ClassMethod SourcesSession() As %Status
         Set name = ..#SOURCESPIPELINE
         Set pipelineId = ""
         Set stmt = ##class(%SQL.Statement).%New()
-        If $$$ISOK(stmt.%Prepare("SELECT TOP 1 ID FROM ETLWizard_Model.Pipeline WHERE Name = ? ORDER BY ID")) {
+        If $$$ISOK(stmt.%Prepare("SELECT TOP 1 ID FROM DataIntegrator_Model.Pipeline WHERE Name = ? ORDER BY ID")) {
             Set rs = stmt.%Execute(name)
             If rs.%Next() {
                 Set pipelineId = rs.%GetData(1)
             }
         }
         If pipelineId = "" {
-            Set pipeline = ##class(ETLWizard.Model.Pipeline).%New()
+            Set pipeline = ##class(DataIntegrator.Model.Pipeline).%New()
             Set pipeline.Name = name
             Set pipeline.Description = "Internal: owns tables mounted from the Data Sources tab"
             Set sc = pipeline.%Save()
@@ -569,11 +569,11 @@ ClassMethod SourcesSession() As %Status
             }
             Set pipelineId = pipeline.%Id()
         } Else {
-            Set pipeline = ##class(ETLWizard.Model.Pipeline).%OpenId(pipelineId)
+            Set pipeline = ##class(DataIntegrator.Model.Pipeline).%OpenId(pipelineId)
         }
         // One Run per browser session is fine — Runs are cheap and keeping them
         // separate keeps each mount's events on its own stream.
-        Set run = ##class(ETLWizard.Model.Run).%New()
+        Set run = ##class(DataIntegrator.Model.Run).%New()
         Set run.Pipeline = pipeline
         // Trigger is a VALUELIST (wizard/schedule/manual) — "sources" is not a
         // member, and Run rejects it at save time
@@ -588,7 +588,7 @@ ClassMethod SourcesSession() As %Status
     }
 }
 
-/// Every ETLWIZARD table with its columns — the same payload as
+/// Every DATAINTEGRATOR table with its columns — the same payload as
 /// /wizard/:runId/mounted but with no run, so the ETL Interop tab can offer
 /// source tables before any pipeline exists. Nothing is pre-ticked.
 ClassMethod ListMountable() As %Status
@@ -596,14 +596,14 @@ ClassMethod ListMountable() As %Status
     Try {
         Set tables = []
         Set stmt = ##class(%SQL.Statement).%New()
-        Set sc = stmt.%Prepare("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'ETLWIZARD' ORDER BY TABLE_NAME")
+        Set sc = stmt.%Prepare("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'DATAINTEGRATOR' ORDER BY TABLE_NAME")
         If $$$ISOK(sc) {
             Set rs = stmt.%Execute()
             While rs.%Next() {
                 Set nm = rs.%GetData(1)
                 Set cols = []
                 Set stmt2 = ##class(%SQL.Statement).%New()
-                If $$$ISOK(stmt2.%Prepare("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'ETLWIZARD' AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION")) {
+                If $$$ISOK(stmt2.%Prepare("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'DATAINTEGRATOR' AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION")) {
                     Set rs2 = stmt2.%Execute(nm)
                     While rs2.%Next() {
                         Do cols.%Push(rs2.%GetData(1))
@@ -634,7 +634,7 @@ ClassMethod RenamePipeline(id As %String) As %Status
         If name = "" {
             Return ..WriteError("name is required", "400 Bad Request")
         }
-        Set pipeline = ##class(ETLWizard.Model.Pipeline).%OpenId(id)
+        Set pipeline = ##class(DataIntegrator.Model.Pipeline).%OpenId(id)
         If '$IsObject(pipeline) {
             Return ..WriteError("pipeline not found: " _ id, "404 Not Found")
         }
@@ -650,12 +650,12 @@ ClassMethod RenamePipeline(id As %String) As %Status
 }
 
 /// ---- ML Models tab (ml-models-tab-plan.md) --------------------------------
-/// All reads come from INFORMATION_SCHEMA.ML_* via ETLWizard.Tools.MLModel;
+/// All reads come from INFORMATION_SCHEMA.ML_* via DataIntegrator.Tools.MLModel;
 /// nothing about a model is stored by this application.
 ClassMethod MLList() As %Status
 {
     Try {
-        Return ..WriteJSON({"models": (##class(ETLWizard.Tools.MLModel).ListModels())})
+        Return ..WriteJSON({"models": (##class(DataIntegrator.Tools.MLModel).ListModels())})
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -674,7 +674,7 @@ ClassMethod MLColumns() As %Status
         If table = "" {
             Return ..WriteError("table is required", "400 Bad Request")
         }
-        Return ..WriteJSON({"columns": (##class(ETLWizard.Tools.MLModel).TableColumns(table))})
+        Return ..WriteJSON({"columns": (##class(DataIntegrator.Tools.MLModel).TableColumns(table))})
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -705,7 +705,7 @@ ClassMethod MLCreate() As %Status
         If (name = "") || (table = "") || (targets.%Size() = 0) {
             Return ..WriteError("name, table and at least one target column are required", "400 Bad Request")
         }
-        Set results = ##class(ETLWizard.Tools.MLModel).CreateBatch(name, table, targets, withCols, timeCol, using)
+        Set results = ##class(DataIntegrator.Tools.MLModel).CreateBatch(name, table, targets, withCols, timeCol, using)
         // report every column, not just the first failure, so a partial batch is
         // visible rather than looking like a total loss
         Set made = 0, firstError = ""
@@ -740,7 +740,7 @@ ClassMethod MLTrain() As %Status
         If name = "" {
             Return ..WriteError("name is required", "400 Bad Request")
         }
-        If '##class(ETLWizard.Tools.MLModel).TrainAsync(name, table, body.%Get("using"), .error) {
+        If '##class(DataIntegrator.Tools.MLModel).TrainAsync(name, table, body.%Get("using"), .error) {
             Return ..WriteError(error)
         }
         Return ..WriteJSON({"ok": 1, "started": 1, "name": (name)})
@@ -757,7 +757,7 @@ ClassMethod MLStatus() As %Status
         If name = "" {
             Return ..WriteError("name is required", "400 Bad Request")
         }
-        Return ..WriteJSON(##class(ETLWizard.Tools.MLModel).Status(name))
+        Return ..WriteJSON(##class(DataIntegrator.Tools.MLModel).Status(name))
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -775,14 +775,14 @@ ClassMethod MLValidate() As %Status
         If (name = "") || (table = "") {
             Return ..WriteError("name and table are required", "400 Bad Request")
         }
-        If '##class(ETLWizard.Tools.MLModel).Validate(name, table, .error, .excluded) {
+        If '##class(DataIntegrator.Tools.MLModel).Validate(name, table, .error, .excluded) {
             Return ..WriteError(error)
         }
         // excluded rows are worth saying out loud: the metrics are computed over
         // fewer rows than the table holds, and silently scoring a smaller set is
         // exactly the kind of thing that makes a number impossible to reconcile
         Return ..WriteJSON({"ok": 1, "excluded": (+$Get(excluded)),
-                            "metrics": (##class(ETLWizard.Tools.MLModel).Metrics(name))})
+                            "metrics": (##class(DataIntegrator.Tools.MLModel).Metrics(name))})
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -796,7 +796,7 @@ ClassMethod MLMetrics() As %Status
         If name = "" {
             Return ..WriteError("name is required", "400 Bad Request")
         }
-        Return ..WriteJSON({"metrics": (##class(ETLWizard.Tools.MLModel).Metrics(name))})
+        Return ..WriteJSON({"metrics": (##class(DataIntegrator.Tools.MLModel).Metrics(name))})
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -816,7 +816,7 @@ ClassMethod MLPredict() As %Status
         If (name = "") || (table = "") {
             Return ..WriteError("name and table are required", "400 Bad Request")
         }
-        Set result = ##class(ETLWizard.Tools.MLModel).Predict(name, table, forClass, maxRows, .error)
+        Set result = ##class(DataIntegrator.Tools.MLModel).Predict(name, table, forClass, maxRows, .error)
         If error '= "" {
             Return ..WriteError(error)
         }
@@ -834,7 +834,7 @@ ClassMethod MLGraph() As %Status
         If name = "" {
             Return ..WriteError("name is required", "400 Bad Request")
         }
-        Return ..WriteJSON(##class(ETLWizard.Tools.MLModel).Graph(name))
+        Return ..WriteJSON(##class(DataIntegrator.Tools.MLModel).Graph(name))
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -851,7 +851,7 @@ ClassMethod MLSettings() As %Status
             Return ..WriteError("name is required", "400 Bad Request")
         }
         Return ..WriteJSON({"name": (name),
-                            "settings": (##class(ETLWizard.Tools.MLModel).DefinitionSettings(name))})
+                            "settings": (##class(DataIntegrator.Tools.MLModel).DefinitionSettings(name))})
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -860,7 +860,7 @@ ClassMethod MLSettings() As %Status
 ClassMethod MLCustomList() As %Status
 {
     Try {
-        Return ..WriteJSON({"models": (##class(ETLWizard.Tools.MLModel).ListCustomModels())})
+        Return ..WriteJSON({"models": (##class(DataIntegrator.Tools.MLModel).ListCustomModels())})
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -880,7 +880,7 @@ ClassMethod MLCustomRead() As %Status
             Return ..WriteError("slug is required", "400 Bad Request")
         }
         Return ..WriteJSON({"slug": (slug), "kind": (kind),
-                            "source": (##class(ETLWizard.Tools.MLModel).ReadCustomModel(slug, kind))})
+                            "source": (##class(DataIntegrator.Tools.MLModel).ReadCustomModel(slug, kind))})
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -901,7 +901,7 @@ ClassMethod MLCustomSave() As %Status
         If (slug = "") || (source = "") {
             Return ..WriteError("slug and source are required", "400 Bad Request")
         }
-        If '##class(ETLWizard.Tools.MLModel).SaveCustomModel(slug, kind, source, .error, .modelName) {
+        If '##class(DataIntegrator.Tools.MLModel).SaveCustomModel(slug, kind, source, .error, .modelName) {
             Return ..WriteError(error)
         }
         Return ..WriteJSON({
@@ -909,7 +909,7 @@ ClassMethod MLCustomSave() As %Status
             "slug": (slug),
             "kind": (kind),
             "modelName": (modelName),
-            "using": (##class(ETLWizard.Tools.MLModel).CustomUsing(kind, slug, modelName))
+            "using": (##class(DataIntegrator.Tools.MLModel).CustomUsing(kind, slug, modelName))
         })
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
@@ -928,7 +928,7 @@ ClassMethod MLCustomDelete() As %Status
         If slug = "" {
             Return ..WriteError("slug is required", "400 Bad Request")
         }
-        If '##class(ETLWizard.Tools.MLModel).DeleteCustomModel(slug, kind, .error) {
+        If '##class(DataIntegrator.Tools.MLModel).DeleteCustomModel(slug, kind, .error) {
             Return ..WriteError(error)
         }
         Return ..WriteJSON({"ok": 1})
@@ -945,7 +945,7 @@ ClassMethod MLDrop() As %Status
         If name = "" {
             Return ..WriteError("name is required", "400 Bad Request")
         }
-        If '##class(ETLWizard.Tools.MLModel).Drop(name, .error) {
+        If '##class(DataIntegrator.Tools.MLModel).Drop(name, .error) {
             Return ..WriteError(error)
         }
         Return ..WriteJSON({"ok": 1, "name": (name)})
@@ -955,17 +955,17 @@ ClassMethod MLDrop() As %Status
 }
 
 /// Models offered by the masthead picker, with the active one flagged. The
-/// list is a server-side allowlist (ETLWizard.Setup.AgentModels) — it is not
+/// list is a server-side allowlist (DataIntegrator.Setup.AgentModels) — it is not
 /// "whatever Ollama has pulled".
 ClassMethod ListModels() As %Status
 {
     Try {
-        Set active = ##class(ETLWizard.Setup).GetAgentModel()
+        Set active = ##class(DataIntegrator.Setup).GetAgentModel()
         If active = "" {
-            Set active = ##class(ETLWizard.Setup).#DEFAULTAGENTMODEL
+            Set active = ##class(DataIntegrator.Setup).#DEFAULTAGENTMODEL
         }
         Set list = []
-        Set models = ##class(ETLWizard.Setup).AgentModels()
+        Set models = ##class(DataIntegrator.Setup).AgentModels()
         Set iter = models.%GetIterator()
         While iter.%GetNext(, .entry) {
             Do list.%Push({"id": (entry.id), "label": (entry.label), "active": (''(entry.id = active))})
@@ -989,7 +989,7 @@ ClassMethod SelectModel() As %Status
         If id = "" {
             Return ..WriteError("model is required")
         }
-        If '##class(ETLWizard.Setup).SetAgentModel(id, .error) {
+        If '##class(DataIntegrator.Setup).SetAgentModel(id, .error) {
             Return ..WriteError(error)
         }
         Return ..WriteJSON({"ok": 1, "active": (id)})
@@ -1022,7 +1022,7 @@ ClassMethod DeletePipeline(id As %String) As %Status
 ClassMethod PurgePipeline(id As %String, Output info As %DynamicObject) As %String [ Internal ]
 {
     Set info = {}
-    Set pipeline = ##class(ETLWizard.Model.Pipeline).%OpenId(id)
+    Set pipeline = ##class(DataIntegrator.Model.Pipeline).%OpenId(id)
     If '$IsObject(pipeline) {
         Return "pipeline not found: " _ id
     }
@@ -1030,32 +1030,32 @@ ClassMethod PurgePipeline(id As %String, Output info As %DynamicObject) As %Stri
     Set removed = []
 
     // production items first: stop scheduling something whose plan is going away
-    Set prod = ##class(ETLWizard.Model.Production).PipelineIdxOpen(id)
+    Set prod = ##class(DataIntegrator.Model.Production).PipelineIdxOpen(id)
     If $IsObject(prod) {
-        Set items = ##class(ETLWizard.Tools.Production).RemovePipelineItems(id)
+        Set items = ##class(DataIntegrator.Tools.Production).RemovePipelineItems(id)
         If items '= "" {
             Do removed.%Push({"productionItems": (items)})
         }
-        Do ##class(ETLWizard.Model.Production).%DeleteId(prod.%Id())
+        Do ##class(DataIntegrator.Model.Production).%DeleteId(prod.%Id())
     }
 
     // events hang off runs, so clear them per run before deleting the runs
     Set rs = ##class(%SQL.Statement).%ExecDirect(,
-        "SELECT ID FROM ETLWizard_Model.Run WHERE Pipeline = ?", id)
+        "SELECT ID FROM DataIntegrator_Model.Run WHERE Pipeline = ?", id)
     Set runs = 0, events = 0
     While rs.%Next() {
         Set runId = rs.%GetData(1)
         Set ev = ##class(%SQL.Statement).%ExecDirect(,
-            "DELETE FROM ETLWizard_Model.Event WHERE Run = ?", runId)
+            "DELETE FROM DataIntegrator_Model.Event WHERE Run = ?", runId)
         Set events = events + ev.%ROWCOUNT
         Set runs = runs + 1
     }
-    Do ##class(%SQL.Statement).%ExecDirect(, "DELETE FROM ETLWizard_Model.Run WHERE Pipeline = ?", id)
-    Do ##class(%SQL.Statement).%ExecDirect(, "DELETE FROM ETLWizard_Model.Edge WHERE Pipeline = ?", id)
-    Do ##class(%SQL.Statement).%ExecDirect(, "DELETE FROM ETLWizard_Model.Node WHERE Pipeline = ?", id)
-    Do ##class(%SQL.Statement).%ExecDirect(, "DELETE FROM ETLWizard_Model.Watermark WHERE Pipeline = ?", id)
+    Do ##class(%SQL.Statement).%ExecDirect(, "DELETE FROM DataIntegrator_Model.Run WHERE Pipeline = ?", id)
+    Do ##class(%SQL.Statement).%ExecDirect(, "DELETE FROM DataIntegrator_Model.Edge WHERE Pipeline = ?", id)
+    Do ##class(%SQL.Statement).%ExecDirect(, "DELETE FROM DataIntegrator_Model.Node WHERE Pipeline = ?", id)
+    Do ##class(%SQL.Statement).%ExecDirect(, "DELETE FROM DataIntegrator_Model.Watermark WHERE Pipeline = ?", id)
 
-    Set sc = ##class(ETLWizard.Model.Pipeline).%DeleteId(id)
+    Set sc = ##class(DataIntegrator.Model.Pipeline).%DeleteId(id)
     If $$$ISERR(sc) {
         Return $System.Status.GetErrorText(sc)
     }
@@ -1071,7 +1071,7 @@ ClassMethod ClearAll() As %Status
 {
     Try {
         Set pipelines = 0, runs = 0, dropped = [], failed = []
-        Set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT ID FROM ETLWizard_Model.Pipeline")
+        Set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT ID FROM DataIntegrator_Model.Pipeline")
         Set ids = ""
         While rs.%Next() {
             Set ids = ids _ $ListBuild(rs.%GetData(1))
@@ -1088,7 +1088,7 @@ ClassMethod ClearAll() As %Status
         For pass = 1:1:2 {
             Set tr = ##class(%SQL.Statement).%ExecDirect(,
                 "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES " _
-                "WHERE TABLE_SCHEMA IN ('ETLW_LANDING','ETLW_STAGING','ETLW_TARGET','ETLWIZARD') " _
+                "WHERE TABLE_SCHEMA IN ('ETLW_LANDING','ETLW_STAGING','ETLW_TARGET','DATAINTEGRATOR') " _
                 "ORDER BY TABLE_SCHEMA, TABLE_NAME")
             While tr.%Next() {
                 Set schema = tr.%GetData(1), name = tr.%GetData(2), type = tr.%GetData(3)
@@ -1099,7 +1099,7 @@ ClassMethod ClearAll() As %Status
                 If (pass = 2) && isView {
                     Continue
                 }
-                If '##class(ETLWizard.Tools.Util).ValidIdent(name) {
+                If '##class(DataIntegrator.Tools.Util).ValidIdent(name) {
                     Continue
                 }
                 Set err = ..DropOne(schema, name, isView, .kind)
@@ -1113,11 +1113,11 @@ ClassMethod ClearAll() As %Status
         // Every published MCP tool reads one of the tables just dropped, so
         // leaving them published would leave an endpoint whose every call
         // fails. Unpublish rather than serve broken tools.
-        Set mcp = ##class(ETLWizard.MCP.Publisher).Clear()
+        Set mcp = ##class(DataIntegrator.MCP.Publisher).Clear()
         // Knowledge bases are built FROM those tables, so they go with them.
         Set kgCleared = 0
         Try {
-            Set kgCleared = ##class(ETLWizard.KG.Ingest).DropAll()
+            Set kgCleared = ##class(DataIntegrator.KG.Ingest).DropAll()
         } Catch {
         }
         Return ..WriteJSON({"pipelines": (pipelines), "runs": (runs),
@@ -1133,30 +1133,30 @@ ClassMethod ClearAll() As %Status
 /// error message; .kind reports what it turned out to be.
 ClassMethod DropOne(schema As %String, name As %String, isView As %Boolean, Output kind As %String) As %String [ Internal ]
 {
-    Set isForeign = +##class(ETLWizard.Tools.Util).ScalarQuery(
+    Set isForeign = +##class(DataIntegrator.Tools.Util).ScalarQuery(
         "SELECT COUNT(*) FROM INFORMATION_SCHEMA.FOREIGN_TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?",
         schema, name)
     If isForeign {
         Set kind = "foreign table"
-        Return ##class(ETLWizard.Tools.Util).RunDDL("DROP FOREIGN TABLE " _ schema _ "." _ name)
+        Return ##class(DataIntegrator.Tools.Util).RunDDL("DROP FOREIGN TABLE " _ schema _ "." _ name)
     }
     If isView {
-        // an ODBC mount is a view over ETLWizard.Link.<name>: drop both
+        // an ODBC mount is a view over DataIntegrator.Link.<name>: drop both
         Set kind = "linked view"
-        Set err = ##class(ETLWizard.Tools.Util).RunDDL("DROP VIEW " _ schema _ "." _ name)
+        Set err = ##class(DataIntegrator.Tools.Util).RunDDL("DROP VIEW " _ schema _ "." _ name)
         If err = "" {
-            Do ##class(%SYSTEM.OBJ).Delete("ETLWizard.Link." _ $Translate(name, "_", ""), "-d")
+            Do ##class(%SYSTEM.OBJ).Delete("DataIntegrator.Link." _ $Translate(name, "_", ""), "-d")
         }
         Return err
     }
     Set kind = "table"
-    Return ##class(ETLWizard.Tools.Util).RunDDL("DROP TABLE " _ schema _ "." _ name)
+    Return ##class(DataIntegrator.Tools.Util).RunDDL("DROP TABLE " _ schema _ "." _ name)
 }
 
 ClassMethod GetPipeline(id As %String) As %Status
 {
     Try {
-        Set pipeline = ##class(ETLWizard.Model.Pipeline).%OpenId(id)
+        Set pipeline = ##class(DataIntegrator.Model.Pipeline).%OpenId(id)
         If '$IsObject(pipeline) {
             Return ..WriteError("pipeline not found: " _ id, "404 Not Found")
         }
@@ -1179,7 +1179,7 @@ ClassMethod GetPipeline(id As %String) As %Status
 ClassMethod AddWatermark(id As %String, json As %DynamicObject) [ Internal ]
 {
     Try {
-        Set wm = ##class(ETLWizard.Model.Watermark).PipelineIdxOpen(id)
+        Set wm = ##class(DataIntegrator.Model.Watermark).PipelineIdxOpen(id)
         If $IsObject(wm) {
             Set json.watermark = wm.ToJSON()
         }
@@ -1219,7 +1219,7 @@ ClassMethod AddIntegrationTiming(json As %DynamicObject) [ Internal ]
             Return
         }
         Set base = $Piece(table, ".", 2)
-        If '##class(ETLWizard.Tools.Util).ValidIdent(base) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(base) {
             Return
         }
         Set extractItem = base _ "_Extract", loadItem = base _ "_Load"
@@ -1300,28 +1300,28 @@ ClassMethod AddTargetFacts(json As %DynamicObject) [ Internal ]
         }
         Set schema = $Piece(table, ".", 1)
         Set base = $Piece(table, ".", 2)
-        If '##class(ETLWizard.Tools.Util).ValidIdent(base) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(base) {
             Return
         }
         Set target = {"table": (table)}
-        Set exists = +##class(ETLWizard.Tools.Util).ScalarQuery(
+        Set exists = +##class(DataIntegrator.Tools.Util).ScalarQuery(
             "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?",
             schema, base)
         If 'exists {
             Set json.target = target
             Return
         }
-        Set target.rowCount = +##class(ETLWizard.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ table)
+        Set target.rowCount = +##class(DataIntegrator.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ table)
         // Rejected rows are reported even when zero: a visible 0 is a stronger
         // governance statement than an absent field. Absent means "no
         // quarantine table exists", which is a different thing and says so.
         Set qTable = "ETLW_AUDIT." _ base _ "_quarantine"
-        Set qExists = +##class(ETLWizard.Tools.Util).ScalarQuery(
+        Set qExists = +##class(DataIntegrator.Tools.Util).ScalarQuery(
             "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'ETLW_AUDIT' AND TABLE_NAME = ?",
             base _ "_quarantine")
         If qExists {
             Set target.quarantineTable = qTable
-            Set target.quarantineRows = +##class(ETLWizard.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ qTable)
+            Set target.quarantineRows = +##class(DataIntegrator.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ qTable)
         }
         // top rows of the target, so the panel can show the business result
         // itself rather than only counts
@@ -1366,17 +1366,17 @@ ClassMethod AddTargetFacts(json As %DynamicObject) [ Internal ]
 ClassMethod GeneratePipelineDocs(id As %String) As %Status
 {
     Try {
-        Set pipeline = ##class(ETLWizard.Model.Pipeline).%OpenId(id)
+        Set pipeline = ##class(DataIntegrator.Model.Pipeline).%OpenId(id)
         If '$IsObject(pipeline) {
             Return ..WriteError("pipeline not found: " _ id, "404 Not Found")
         }
         // the docs generator hangs off a run, so use the pipeline's latest
-        Set runId = ##class(ETLWizard.Tools.Util).ScalarQuery(
-            "SELECT TOP 1 ID FROM ETLWizard_Model.Run WHERE Pipeline = ? ORDER BY ID DESC", id)
+        Set runId = ##class(DataIntegrator.Tools.Util).ScalarQuery(
+            "SELECT TOP 1 ID FROM DataIntegrator_Model.Run WHERE Pipeline = ? ORDER BY ID DESC", id)
         If runId = "" {
             Return ..WriteError("pipeline has no runs yet - nothing to document", "409 Conflict")
         }
-        Set cat = ##class(ETLWizard.Tools.Catalog).%New()
+        Set cat = ##class(DataIntegrator.Tools.Catalog).%New()
         Set res = cat.GenerateDocs(runId)
         If $Extract(res, 1, 5) = "ERROR" {
             Return ..WriteError(res)
@@ -1405,21 +1405,21 @@ ClassMethod GeneratePipelineDocs(id As %String) As %Status
 ClassMethod RunPipeline(id As %String) As %Status
 {
     Try {
-        Set pipeline = ##class(ETLWizard.Model.Pipeline).%OpenId(id)
+        Set pipeline = ##class(DataIntegrator.Model.Pipeline).%OpenId(id)
         If '$IsObject(pipeline) {
             Return ..WriteError("pipeline not found: " _ id, "404 Not Found")
         }
         If pipeline.MetadataJson = "" {
             Return ..WriteError("pipeline has no deployed metadata - complete the wizard first", "409 Conflict")
         }
-        Set run = ##class(ETLWizard.Model.Run).%New()
+        Set run = ##class(DataIntegrator.Model.Run).%New()
         Set run.Pipeline = pipeline
         Set run.Trigger = "manual"
         Set sc = run.%Save()
         If $$$ISERR(sc) {
             Return ..WriteError($System.Status.GetErrorText(sc))
         }
-        Job ##class(ETLWizard.Runtime.Executor).Execute(id, run.%Id())
+        Job ##class(DataIntegrator.Runtime.Executor).Execute(id, run.%Id())
         Return ..WriteJSON({"pipelineId": (id), "runId": (run.%Id()), "status": "started"}, "202 Accepted")
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
@@ -1432,7 +1432,7 @@ ClassMethod RunPipeline(id As %String) As %Status
 ClassMethod ProductionAction(id As %String) As %Status
 {
     Try {
-        Set pipeline = ##class(ETLWizard.Model.Pipeline).%OpenId(id)
+        Set pipeline = ##class(DataIntegrator.Model.Pipeline).%OpenId(id)
         If '$IsObject(pipeline) {
             Return ..WriteError("pipeline not found: " _ id, "404 Not Found")
         }
@@ -1449,14 +1449,14 @@ ClassMethod ProductionAction(id As %String) As %Status
             Return ..WriteError("action must be generate | start | stop | runnow", "400 Bad Request")
         }
         // Anchor tool calls on a run for the event stream
-        Set run = ##class(ETLWizard.Model.Run).%New()
+        Set run = ##class(DataIntegrator.Model.Run).%New()
         Set run.Pipeline = pipeline
         Set run.Trigger = "manual"
         Set sc = run.%Save()
         If $$$ISERR(sc) {
             Return ..WriteError($System.Status.GetErrorText(sc))
         }
-        Set tool = ##class(ETLWizard.Tools.Production).%New()
+        Set tool = ##class(DataIntegrator.Tools.Production).%New()
         If action = "generate" {
             Set result = tool.GenerateProduction(run.%Id(), interval, "", pool)
         } ElseIf action = "start" {
@@ -1482,7 +1482,7 @@ ClassMethod ProductionAction(id As %String) As %Status
 ClassMethod GetProduction(id As %String) As %Status
 {
     Try {
-        Set prod = ##class(ETLWizard.Model.Production).PipelineIdxOpen(id)
+        Set prod = ##class(DataIntegrator.Model.Production).PipelineIdxOpen(id)
         If '$IsObject(prod) {
             Return ..WriteError("no production generated for pipeline " _ id, "404 Not Found")
         }
@@ -1538,13 +1538,13 @@ ClassMethod WizardOptions() As %Status
         // Foreign servers are what discovery actually reads — a server wraps a
         // connection, and its name is unrelated to the connection's. Offering
         // connections as "sources" produces
-        // "Foreign server 'ETLWIZARD.<conn>' not found", so the Data Sources
+        // "Foreign server 'DATAINTEGRATOR.<conn>' not found", so the Data Sources
         // picker is built from these instead. PARAMETERS carries
         // CONNECTION="..." for JDBC and HOST="..." for CSV; surface it so the
         // user can tell two servers on the same database apart.
         Set foreignServers = []
         Set stmtFs = ##class(%SQL.Statement).%New()
-        If $$$ISOK(stmtFs.%Prepare("SELECT SERVER_NAME, FOREIGN_DATA_WRAPPER, PARAMETERS FROM INFORMATION_SCHEMA.FOREIGN_SERVERS WHERE SERVER_SCHEMA = 'ETLWIZARD' ORDER BY SERVER_NAME")) {
+        If $$$ISOK(stmtFs.%Prepare("SELECT SERVER_NAME, FOREIGN_DATA_WRAPPER, PARAMETERS FROM INFORMATION_SCHEMA.FOREIGN_SERVERS WHERE SERVER_SCHEMA = 'DATAINTEGRATOR' ORDER BY SERVER_NAME")) {
             Set rsFs = stmtFs.%Execute()
             While rsFs.%Next() {
                 Set wrapper = rsFs.%GetData(2)
@@ -1564,8 +1564,8 @@ ClassMethod WizardOptions() As %Status
             // Audience presentation (IMPROVEMENTS_SPEC §1.1). The frontend
             // already fetches this response exactly once, so carrying the view
             // default and the scenario here introduces no new request.
-            "defaultView": (##class(ETLWizard.Setup).GetDefaultView()),
-            "scenario": (##class(ETLWizard.Setup).Scenario()),
+            "defaultView": (##class(DataIntegrator.Setup).GetDefaultView()),
+            "scenario": (##class(DataIntegrator.Setup).Scenario()),
             // MySQL and SQLServer were removed: their presets pointed at driver
             // jars that are not shipped, so picking them failed at connect time
             // with a driver-not-found error. "JDBC" is the generic entry - the
@@ -1604,12 +1604,12 @@ ClassMethod WizardConnect(runId As %String) As %Status
         If '$IsObject(body) {
             Return ..WriteError("JSON body required", "400 Bad Request")
         }
-        Set ft = ##class(ETLWizard.Tools.ForeignTable).%New()
+        Set ft = ##class(DataIntegrator.Tools.ForeignTable).%New()
         Set wrapper = $Select($ZConvert(body.mode, "L") = "csv": "CSV", 1: "JDBC")
         Set targetRef = $Select(wrapper = "CSV": body.%Get("directory", "/opt/irisbuild/dropzone"), 1: body.connection)
         Set res = ft.CreateForeignServer(runId, body.serverName, wrapper, targetRef)
         If $Extract(res, 1, 5) '= "ERROR" {
-            Set disc = ##class(ETLWizard.Tools.SourceDiscovery).%New()
+            Set disc = ##class(DataIntegrator.Tools.SourceDiscovery).%New()
             If wrapper = "JDBC" {
                 Set test = disc.TestConnection(body.serverName)
                 If $Extract(test, 1, 5) = "ERROR" {
@@ -1630,12 +1630,12 @@ ClassMethod WizardDiscover(runId As %String) As %Status
     Try {
         Set body = ..ReadBody()
         If $ZConvert(body.mode, "L") = "csv" {
-            Set csv = ##class(ETLWizard.Tools.CsvProfiling).%New()
+            Set csv = ##class(DataIntegrator.Tools.CsvProfiling).%New()
             // blank => the dropzone default
             Do csv.SetDirectory(body.%Get("directory", ""))
             Return ..ToolResult(csv.ListCsvFiles())
         }
-        Set disc = ##class(ETLWizard.Tools.SourceDiscovery).%New()
+        Set disc = ##class(DataIntegrator.Tools.SourceDiscovery).%New()
         If $ZConvert(body.mode, "L") = "odbc" {
             // no foreign server exists for ODBC — walk the driver's catalog.
             // schemaName absent => level 1 (schemas), present => level 2 (tables)
@@ -1658,7 +1658,7 @@ ClassMethod WizardTableDetails(runId As %String) As %Status
     Try {
         Set body = ..ReadBody()
         If $ZConvert(body.mode, "L") = "csv" {
-            Set csv = ##class(ETLWizard.Tools.CsvProfiling).%New()
+            Set csv = ##class(DataIntegrator.Tools.CsvProfiling).%New()
             Do csv.SetDirectory(body.%Get("directory", ""))
             Set inspect = csv.InspectCsv(body.fileName, 3)
             Set infer = csv.InferCsvTypes(body.fileName)
@@ -1675,7 +1675,7 @@ ClassMethod WizardTableDetails(runId As %String) As %Status
             }
             Return ..WriteJSON(out)
         }
-        Set disc = ##class(ETLWizard.Tools.SourceDiscovery).%New()
+        Set disc = ##class(DataIntegrator.Tools.SourceDiscovery).%New()
         Set out = {}
         Set out.columns = ..ParseOr(disc.DiscoverColumns(body.serverName, body.schemaName, body.tableName))
         Set out.pk = ..ParseOr(disc.DiscoverPrimaryKey(body.serverName, body.schemaName, body.tableName))
@@ -1708,7 +1708,7 @@ ClassMethod ScheduleSpecFromBody(body As %DynamicObject) As %String [ Internal ]
     If times = "" {
         Return ""
     }
-    Return ##class(ETLWizard.Tools.Production).BuildSchedule(days, times)
+    Return ##class(DataIntegrator.Tools.Production).BuildSchedule(days, times)
 }
 
 ClassMethod ParseOr(res As %String) [ Internal ]
@@ -1725,11 +1725,11 @@ ClassMethod WizardMount(runId As %String) As %Status
 {
     Try {
         Set body = ..ReadBody()
-        Set ft = ##class(ETLWizard.Tools.ForeignTable).%New()
+        Set ft = ##class(DataIntegrator.Tools.ForeignTable).%New()
         If $ZConvert(body.mode, "L") = "csv" {
             Set defs = body.%Get("columnDefs", "")
             If defs = "" {
-                Set csv = ##class(ETLWizard.Tools.CsvProfiling).%New()
+                Set csv = ##class(DataIntegrator.Tools.CsvProfiling).%New()
                 Set infer = ..ParseOr(csv.InferCsvTypes(body.fileName))
                 If $IsObject(infer) {
                     Set defs = infer.columnDefs
@@ -1742,7 +1742,7 @@ ClassMethod WizardMount(runId As %String) As %Status
             If pk = "" {
                 // the picker sends whatever SQLPrimaryKeys reported; fall back to
                 // asking the driver again rather than failing the mount outright
-                Set discPk = ##class(ETLWizard.Tools.SourceDiscovery).%New()
+                Set discPk = ##class(DataIntegrator.Tools.SourceDiscovery).%New()
                 Set conn = discPk.OdbcConnect(body.connection, .cerr)
                 If cerr = "" {
                     Set pk = discPk.OdbcPrimaryKeyList(conn, schema, body.tableName)
@@ -1757,7 +1757,7 @@ ClassMethod WizardMount(runId As %String) As %Status
         If $Extract(res, 1, 5) = "ERROR" {
             Return ..WriteError(res)
         }
-        Set disc = ##class(ETLWizard.Tools.SourceDiscovery).%New()
+        Set disc = ##class(DataIntegrator.Tools.SourceDiscovery).%New()
         Return ..WriteJSON({"message": (res), "test": (..ParseOr(disc.TestForeignTable(body.localName, 3)))})
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
@@ -1769,7 +1769,7 @@ ClassMethod WizardRecommend(runId As %String) As %Status
 {
     Try {
         Set body = ..ReadBody()
-        Set strat = ##class(ETLWizard.Tools.Strategy).%New()
+        Set strat = ##class(DataIntegrator.Tools.Strategy).%New()
         Return ..ToolResult(strat.RecommendStrategy(body.%ToJSON()))
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
@@ -1781,7 +1781,7 @@ ClassMethod WizardDeploy(runId As %String) As %Status
 {
     Try {
         Set body = ..ReadBody()
-        Set ld = ##class(ETLWizard.Tools.Load).%New()
+        Set ld = ##class(DataIntegrator.Tools.Load).%New()
         Set res = ld.CreateLayerTables(runId, body.baseName, body.foreignTable, body.pkColumns)
         If $Extract(res, 1, 5) = "ERROR" {
             Return ..WriteError(res)
@@ -1791,7 +1791,7 @@ ClassMethod WizardDeploy(runId As %String) As %Status
             "append_only": "append", "csv_arrival": "csv_arrival", : "incremental")
         Set meta = {}
         Set meta.pipelineName = body.%Get("pipelineName", body.baseName)
-        Set meta.source = {"type": (body.%Get("sourceType", "JDBC")), "foreignTable": ("ETLWIZARD." _ body.foreignTable)}
+        Set meta.source = {"type": (body.%Get("sourceType", "JDBC")), "foreignTable": ("DATAINTEGRATOR." _ body.foreignTable)}
         If body.%Get("watermarkColumn", "") '= "" {
             Set meta.source.watermark = {"type": ($Select(strategy = "incremental_numeric": "numeric", 1: "timestamp")), "column": (body.watermarkColumn)}
         }
@@ -1807,15 +1807,15 @@ ClassMethod WizardDeploy(runId As %String) As %Status
         Set meta.layers = {"landing": ("ETLW_LANDING." _ body.baseName _ "_raw"),
                            "staging": ("ETLW_STAGING." _ body.baseName _ "_delta"),
                            "target": ("ETLW_TARGET." _ body.baseName)}
-        Set cat = ##class(ETLWizard.Tools.Catalog).%New()
+        Set cat = ##class(DataIntegrator.Tools.Catalog).%New()
         Set res2 = cat.SetPipelineMetadata(runId, meta.%ToJSON(), "Deployed")
         If $Extract(res2, 1, 5) = "ERROR" {
             Return ..WriteError(res2)
         }
-        // Every pipeline joins the shared production ETLWizard.Prod.Main as its
+        // Every pipeline joins the shared production DataIntegrator.Prod.Main as its
         // own item group (<base>_Extract/_Orchestrate/_Load), scheduled on the
         // poll interval. All strategies are executor-supported now.
-        Set prodTool = ##class(ETLWizard.Tools.Production).%New()
+        Set prodTool = ##class(DataIntegrator.Tools.Production).%New()
         Set prodMsg = prodTool.GenerateProduction(runId, +body.%Get("pollSeconds", 300), "", +body.%Get("poolSize", 1))
         If $Extract(prodMsg, 1, 5) '= "ERROR" {
             Set applyMsg = prodTool.ApplyProduction(runId)
@@ -1836,7 +1836,7 @@ ClassMethod WizardLoad(runId As %String) As %Status
 {
     Try {
         Set body = ..ReadBody()
-        Set ld = ##class(ETLWizard.Tools.Load).%New()
+        Set ld = ##class(DataIntegrator.Tools.Load).%New()
         Set strategy = body.%Get("strategy", "incremental_timestamp")
         If strategy = "full" {
             Set res = ld.RunFullLoad(runId, body.baseName, body.foreignTable)
@@ -1866,7 +1866,7 @@ ClassMethod GatewayCreate() As %Status
             Return ..WriteError("JSON body required", "400 Bad Request")
         }
         Set name = body.%Get("name", "")
-        Set err = ##class(ETLWizard.Setup).CreateGatewayConnectionAny(
+        Set err = ##class(DataIntegrator.Setup).CreateGatewayConnectionAny(
             name, body.%Get("kind", "jdbc"), body.%Get("url", ""), body.%Get("dsn", ""),
             body.%Get("user", ""), body.%Get("password", ""),
             body.%Get("driver", ""), body.%Get("classpath", ""))
@@ -1874,20 +1874,20 @@ ClassMethod GatewayCreate() As %Status
             Return ..WriteError(err, "400 Bad Request")
         }
         // Smoke test: mount a throwaway foreign server over it and SELECT 1
-        Set probe = "etlw_probe_" _ $Increment(^ETLWizard.ProbeSeq)
+        Set probe = "etlw_probe_" _ $Increment(^DataIntegrator.ProbeSeq)
         Set tested = 0
         Set testMsg = "created (not tested)"
-        Set ddlErr = ##class(ETLWizard.Tools.Util).RunDDL(
-            "CREATE FOREIGN SERVER ETLWIZARD." _ probe _ " FOREIGN DATA WRAPPER JDBC CONNECTION '" _ name _ "'")
+        Set ddlErr = ##class(DataIntegrator.Tools.Util).RunDDL(
+            "CREATE FOREIGN SERVER DATAINTEGRATOR." _ probe _ " FOREIGN DATA WRAPPER JDBC CONNECTION '" _ name _ "'")
         If ddlErr = "" {
-            Set res = ##class(ETLWizard.Tools.Util).Through(probe, "SELECT 1", 1)
+            Set res = ##class(DataIntegrator.Tools.Util).Through(probe, "SELECT 1", 1)
             If $Extract(res, 1, 5) = "ERROR" {
                 Set testMsg = "created, but the connection test failed: " _ $Extract(res, 1, 200)
             } Else {
                 Set tested = 1
                 Set testMsg = "created and tested OK"
             }
-            Do ##class(ETLWizard.Tools.Util).RunDDL("DROP FOREIGN SERVER ETLWIZARD." _ probe)
+            Do ##class(DataIntegrator.Tools.Util).RunDDL("DROP FOREIGN SERVER DATAINTEGRATOR." _ probe)
         }
         Return ..WriteJSON({"name": (name), "tested": (tested), "message": (testMsg)})
     } Catch ex {
@@ -1900,31 +1900,31 @@ ClassMethod GatewayCreate() As %Status
 ClassMethod WizardMounted(runId As %String) As %Status
 {
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return ..WriteError("run not found: " _ runId, "404 Not Found")
         }
         // this pipeline's own mounts (pre-selected in the picker)
         Set own = ""
         Set stmt = ##class(%SQL.Statement).%New()
-        Set sc = stmt.%Prepare("SELECT Name FROM ETLWizard_Model.Node WHERE Pipeline = ? AND Kind = 'foreign_table' ORDER BY ID")
+        Set sc = stmt.%Prepare("SELECT Name FROM DataIntegrator_Model.Node WHERE Pipeline = ? AND Kind = 'foreign_table' ORDER BY ID")
         If $$$ISOK(sc) {
             Set rs = stmt.%Execute(run.Pipeline.%Id())
             While rs.%Next() {
                 Set own = own _ $ListBuild($Piece(rs.%GetData(1), ".", *))
             }
         }
-        // every ETLWIZARD table is joinable, so offer them all with their columns
+        // every DATAINTEGRATOR table is joinable, so offer them all with their columns
         Set tables = []
         Set stmt2 = ##class(%SQL.Statement).%New()
-        Set sc = stmt2.%Prepare("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'ETLWIZARD' ORDER BY TABLE_NAME")
+        Set sc = stmt2.%Prepare("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'DATAINTEGRATOR' ORDER BY TABLE_NAME")
         If $$$ISOK(sc) {
             Set rs2 = stmt2.%Execute()
             While rs2.%Next() {
                 Set nm = rs2.%GetData(1)
                 Set cols = []
                 Set stmt3 = ##class(%SQL.Statement).%New()
-                If $$$ISOK(stmt3.%Prepare("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'ETLWIZARD' AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION")) {
+                If $$$ISOK(stmt3.%Prepare("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'DATAINTEGRATOR' AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION")) {
                     Set rs3 = stmt3.%Execute(nm)
                     While rs3.%Next() {
                         Do cols.%Push(rs3.%GetData(1))
@@ -1955,7 +1955,7 @@ ClassMethod WizardTransformGenerate(runId As %String) As %Status
         }
         // JOB it: a local model can outlast the gateway timeout. The result
         // arrives on the event stream as `sqlgen.result`.
-        Job ##class(ETLWizard.Agent.SqlGen).GenerateAsync(runId, instruction,
+        Job ##class(DataIntegrator.Agent.SqlGen).GenerateAsync(runId, instruction,
             body.%Get("currentSql", ""), body.%Get("tables", ""))
         Return ..WriteJSON({"status": "generating"}, "202 Accepted")
     } Catch ex {
@@ -1968,7 +1968,7 @@ ClassMethod WizardTransformPreview(runId As %String) As %Status
 {
     Try {
         Set body = ..ReadBody()
-        Set ld = ##class(ETLWizard.Tools.Load).%New()
+        Set ld = ##class(DataIntegrator.Tools.Load).%New()
         Return ..ToolResult(ld.PreviewTransform(body.sql, +body.%Get("maxRows", 10)))
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
@@ -1985,7 +1985,7 @@ ClassMethod WizardSuggestKey(runId As %String) As %Status
         If '$IsObject(body) {
             Return ..WriteError("JSON body required", "400 Bad Request")
         }
-        Set json = ##class(ETLWizard.Agent.SqlGen).SuggestKey(runId, body.%Get("sql", ""), body.%Get("tables", ""))
+        Set json = ##class(DataIntegrator.Agent.SqlGen).SuggestKey(runId, body.%Get("sql", ""), body.%Get("tables", ""))
         Return ..WriteJSON(##class(%DynamicObject).%FromJSON(json))
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
@@ -2035,7 +2035,7 @@ ClassMethod WizardTransformDeploy(runId As %String) As %Status
         If wm '= "" { Set cfg = cfg _ "|Watermark: " _ wm }
         If poll { Set cfg = cfg _ "|Call interval: " _ poll _ "s" }
         If +body.%Get("poolSize", 1) > 1 { Set cfg = cfg _ "|Pool size: " _ +body.%Get("poolSize", 1) }
-        Set ld = ##class(ETLWizard.Tools.Load).%New()
+        Set ld = ##class(DataIntegrator.Tools.Load).%New()
         Set res = ld.DeployTransform(runId, base, tsql, pk, sourcesCsv, cfg)
         If $Extract(res, 1, 5) = "ERROR" {
             Return ..WriteError(res)
@@ -2056,7 +2056,7 @@ ClassMethod WizardTransformDeploy(runId As %String) As %Status
         }
         Set meta.loadStrategy = {"type": (loadType), "historyPolicy": (body.%Get("historyPolicy", "latest_state"))}
         Set meta.layers = {"staging": ("ETLW_STAGING." _ base _ "_delta"), "target": ("ETLW_TARGET." _ base)}
-        Set cat = ##class(ETLWizard.Tools.Catalog).%New()
+        Set cat = ##class(DataIntegrator.Tools.Catalog).%New()
         Set res2 = cat.SetPipelineMetadata(runId, meta.%ToJSON(), "Deployed")
         If $Extract(res2, 1, 5) = "ERROR" {
             Return ..WriteError(res2)
@@ -2069,7 +2069,7 @@ ClassMethod WizardTransformDeploy(runId As %String) As %Status
             Set spec = {}
             Set spec.tableColumnar = +body.%Get("tableColumnar", 0)
             Set spec.indexes = body.%Get("indexes", [])
-            Set idxTool = ##class(ETLWizard.Tools.Indexing).%New()
+            Set idxTool = ##class(DataIntegrator.Tools.Indexing).%New()
             Set indexMsg = ..ParseOr(idxTool.CreateIndexes(runId, base, spec.%ToJSON()))
         }
 
@@ -2093,7 +2093,7 @@ ClassMethod WizardTransformDeploy(runId As %String) As %Status
         Set loadRes = ld.RunTransformLoad(runId, base, tsql, loadType, body.%Get("watermarkColumn", ""))
 
         // shared production item group (interval OR wall-clock schedule)
-        Set prodTool = ##class(ETLWizard.Tools.Production).%New()
+        Set prodTool = ##class(DataIntegrator.Tools.Production).%New()
         Set prodMsg = prodTool.GenerateProduction(runId, +body.%Get("pollSeconds", 300), scheduleSpec, +body.%Get("poolSize", 1))
         If $Extract(prodMsg, 1, 5) '= "ERROR" {
             Do prodTool.ApplyProduction(runId)
@@ -2121,7 +2121,7 @@ ClassMethod WizardRestProbe(runId As %String) As %Status
         If url = "" {
             Return ..WriteError("url is required", "400 Bad Request")
         }
-        Set res = ##class(ETLWizard.Tools.RestSource).ProbeEndpoint(url,
+        Set res = ##class(DataIntegrator.Tools.RestSource).ProbeEndpoint(url,
             body.%Get("dataPath", ""), body.%Get("headers", ""))
         If $Extract(res, 1, 5) = "ERROR" {
             Return ..WriteError(res)
@@ -2133,7 +2133,7 @@ ClassMethod WizardRestProbe(runId As %String) As %Status
 }
 
 /// Mount the chosen endpoints: land each one's pages and expose it as
-/// ETLWIZARD.<base>_<endpoint>. The wizard then treats them as ordinary
+/// DATAINTEGRATOR.<base>_<endpoint>. The wizard then treats them as ordinary
 /// tables, so the existing transform step joins them into one target.
 ClassMethod WizardRestMount(runId As %String) As %Status
 {
@@ -2143,7 +2143,7 @@ ClassMethod WizardRestMount(runId As %String) As %Status
             Return ..WriteError("JSON body required", "400 Bad Request")
         }
         Set base = $ZStrip(body.%Get("baseName", ""), "<>W")
-        If '##class(ETLWizard.Tools.Util).ValidIdent(base) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(base) {
             Return ..WriteError("invalid baseName", "400 Bad Request")
         }
         Set eps = body.%Get("endpoints", [])
@@ -2154,7 +2154,7 @@ ClassMethod WizardRestMount(runId As %String) As %Status
         Set it = eps.%GetIterator()
         While it.%GetNext(.i, .ep) {
             Set name = ep.%Get("name", "endpoint" _ (i + 1))
-            Set res = ##class(ETLWizard.Tools.RestSource).MountEndpoint(runId, base, name, ep.%ToJSON())
+            Set res = ##class(DataIntegrator.Tools.RestSource).MountEndpoint(runId, base, name, ep.%ToJSON())
             If $Extract(res, 1, 5) = "ERROR" {
                 Do failed.%Push({"endpoint": (name), "error": (res)})
             } Else {
@@ -2182,7 +2182,7 @@ ClassMethod WizardIndexRecommend(runId As %String) As %Status
         If '$IsObject(body) {
             Return ..WriteError("JSON body required", "400 Bad Request")
         }
-        Set tool = ##class(ETLWizard.Tools.Indexing).%New()
+        Set tool = ##class(DataIntegrator.Tools.Indexing).%New()
         Set res = tool.RecommendIndexes(runId, body.%Get("baseName", ""),
             body.%Get("pkColumns", ""), body.%Get("watermarkColumn", ""))
         If $Extract(res, 1, 5) = "ERROR" {
@@ -2208,7 +2208,7 @@ ClassMethod WizardIndexApply(runId As %String) As %Status
         Set spec = {}
         Set spec.tableColumnar = +body.%Get("tableColumnar", 0)
         Set spec.indexes = body.%Get("indexes", [])
-        Set tool = ##class(ETLWizard.Tools.Indexing).%New()
+        Set tool = ##class(DataIntegrator.Tools.Indexing).%New()
         Set res = tool.CreateIndexes(runId, body.%Get("baseName", ""), spec.%ToJSON())
         If $Extract(res, 1, 5) = "ERROR" {
             Return ..WriteError(res)
@@ -2247,7 +2247,7 @@ ClassMethod WizardUpload(runId As %String) As %Status
         Set note = ""
         Set csvFile = fn
         If ext = "xlsx" {
-            Set conv = ##class(ETLWizard.Tools.BulkLoad).XlsxToCsv(fn)
+            Set conv = ##class(DataIntegrator.Tools.BulkLoad).XlsxToCsv(fn)
             If $Extract(conv, 1, 5) = "ERROR" {
                 Return ..WriteError(conv)
             }
@@ -2258,7 +2258,7 @@ ClassMethod WizardUpload(runId As %String) As %Status
         // header names that are not identifiers) BEFORE inferring columns, so
         // the inferred names and the file's header agree - they must, because
         // LOAD DATA matches them by name.
-        Set nerr = ##class(ETLWizard.Tools.BulkLoad).NormalizeCsv(csvFile, ",", .cleanFile, .cleanNote)
+        Set nerr = ##class(DataIntegrator.Tools.BulkLoad).NormalizeCsv(csvFile, ",", .cleanFile, .cleanNote)
         If $Extract(nerr, 1, 5) = "ERROR" {
             Return ..WriteError($Extract(nerr, 8, *))
         }
@@ -2266,7 +2266,7 @@ ClassMethod WizardUpload(runId As %String) As %Status
             Set csvFile = cleanFile
             Set note = note _ $Select(note = "": "", 1: "; ") _ cleanNote
         }
-        Set inf = ..ParseOr(##class(ETLWizard.Tools.BulkLoad).InferColumns(csvFile))
+        Set inf = ..ParseOr(##class(DataIntegrator.Tools.BulkLoad).InferColumns(csvFile))
         Set out = {}
         Set out.csvFile = csvFile
         Set out.note = note
@@ -2298,12 +2298,12 @@ ClassMethod WizardBulkDeploy(runId As %String) As %Status
         // a file dropped into the dropzone by hand), so repair it here too.
         // NormalizeCsv is a no-op on a file that is already loadable.
         Set normalizeNote = ""
-        Set nerr = ##class(ETLWizard.Tools.BulkLoad).NormalizeCsv(fileName, separator, .cleanFile, .cleanNote)
+        Set nerr = ##class(DataIntegrator.Tools.BulkLoad).NormalizeCsv(fileName, separator, .cleanFile, .cleanNote)
         If ($Extract(nerr, 1, 5) '= "ERROR") && (cleanFile '= "") {
             Set fileName = cleanFile
             Set normalizeNote = cleanNote
         }
-        Set res = ##class(ETLWizard.Tools.BulkLoad).Deploy(runId, base, fileName, columnDefs, strategy, bulk, header, separator)
+        Set res = ##class(DataIntegrator.Tools.BulkLoad).Deploy(runId, base, fileName, columnDefs, strategy, bulk, header, separator)
         If $Extract(res, 1, 5) = "ERROR" {
             Return ..WriteError(res)
         }
@@ -2316,8 +2316,8 @@ ClassMethod WizardBulkDeploy(runId As %String) As %Status
         // The ingested file is a SOURCE, so it is recorded as one. Writing a
         // `target` here would put it in front of the Knowledge Base tab and the
         // results panel as though an ETL had produced it.
-        Set meta.layers = {"source": (##class(ETLWizard.Tools.BulkLoad).SourceTableName(base))}
-        Set cat = ##class(ETLWizard.Tools.Catalog).%New()
+        Set meta.layers = {"source": (##class(DataIntegrator.Tools.BulkLoad).SourceTableName(base))}
+        Set cat = ##class(DataIntegrator.Tools.Catalog).%New()
         Set res2 = cat.SetPipelineMetadata(runId, meta.%ToJSON(), "Deployed")
         If $Extract(res2, 1, 5) = "ERROR" {
             Return ..WriteError(res2)
@@ -2338,16 +2338,16 @@ ClassMethod WizardBulkDeploy(runId As %String) As %Status
 
 // ------------------------------------------------- Knowledge Graph tab
 //
-// Thin wrappers over ETLWizard.KG.Ingest (mds/knowledge-graph-tab-plan.md).
+// Thin wrappers over DataIntegrator.KG.Ingest (mds/knowledge-graph-tab-plan.md).
 // Ingestion is driven one batch per request rather than one long call: a batch
 // is seconds, a full run can be hours, and the webgateway gives up at ~60s.
 
 ClassMethod KGCandidates() As %Status
 {
     Try {
-        Return ..WriteJSON({"tables": (##class(ETLWizard.KG.Ingest).ListCandidates()),
-                            "chatModel": (##class(ETLWizard.KG.Setup).GetChatModel()),
-                            "extractModel": (##class(ETLWizard.KG.Setup).GetExtractModel())})
+        Return ..WriteJSON({"tables": (##class(DataIntegrator.KG.Ingest).ListCandidates()),
+                            "chatModel": (##class(DataIntegrator.KG.Setup).GetChatModel()),
+                            "extractModel": (##class(DataIntegrator.KG.Setup).GetExtractModel())})
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -2360,7 +2360,7 @@ ClassMethod KGProfile() As %Status
         If '$IsObject(body) {
             Return ..WriteError("JSON body required", "400 Bad Request")
         }
-        Set res = ##class(ETLWizard.KG.Ingest).Profile(body.%Get("table", ""), body.%Get("column", ""))
+        Set res = ##class(DataIntegrator.KG.Ingest).Profile(body.%Get("table", ""), body.%Get("column", ""))
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error, "400 Bad Request")
         }
@@ -2379,11 +2379,11 @@ ClassMethod KGStart() As %Status
         }
         // The schema is created on demand: a fresh install has no ETLW_KG until
         // someone actually wants one.
-        Set err = ##class(ETLWizard.KG.Setup).Install(0)
+        Set err = ##class(DataIntegrator.KG.Setup).Install(0)
         If $Extract(err, 1, 5) = "ERROR" {
             Return ..WriteError($Extract(err, 8, *))
         }
-        Set res = ##class(ETLWizard.KG.Ingest).Start(body)
+        Set res = ##class(DataIntegrator.KG.Ingest).Start(body)
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error, "400 Bad Request")
         }
@@ -2396,7 +2396,7 @@ ClassMethod KGStart() As %Status
 ClassMethod KGList() As %Status
 {
     Try {
-        Return ..WriteJSON({"corpora": (##class(ETLWizard.KG.Ingest).List())})
+        Return ..WriteJSON({"corpora": (##class(DataIntegrator.KG.Ingest).List())})
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -2405,7 +2405,7 @@ ClassMethod KGList() As %Status
 ClassMethod KGStatus(id As %String) As %Status
 {
     Try {
-        Set res = ##class(ETLWizard.KG.Ingest).Status(id)
+        Set res = ##class(DataIntegrator.KG.Ingest).Status(id)
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error, "404 Not Found")
         }
@@ -2420,7 +2420,7 @@ ClassMethod KGStatus(id As %String) As %Status
 ClassMethod KGRun(id As %String) As %Status
 {
     Try {
-        Set res = ##class(ETLWizard.KG.Ingest).RunBatch(id)
+        Set res = ##class(DataIntegrator.KG.Ingest).RunBatch(id)
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error, "400 Bad Request")
         }
@@ -2433,7 +2433,7 @@ ClassMethod KGRun(id As %String) As %Status
 ClassMethod KGCancel(id As %String) As %Status
 {
     Try {
-        Return ..WriteJSON(##class(ETLWizard.KG.Ingest).Cancel(id))
+        Return ..WriteJSON(##class(DataIntegrator.KG.Ingest).Cancel(id))
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -2442,7 +2442,7 @@ ClassMethod KGCancel(id As %String) As %Status
 ClassMethod KGDrop(id As %String) As %Status
 {
     Try {
-        Set res = ##class(ETLWizard.KG.Ingest).Drop(id)
+        Set res = ##class(DataIntegrator.KG.Ingest).Drop(id)
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error)
         }
@@ -2456,7 +2456,7 @@ ClassMethod KGGraph(id As %String) As %Status
 {
     Try {
         Set limit = +$Get(%request.Data("limit", 1), 200)
-        Set res = ##class(ETLWizard.KG.Ingest).Graph(id, limit)
+        Set res = ##class(DataIntegrator.KG.Ingest).Graph(id, limit)
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error)
         }
@@ -2473,7 +2473,7 @@ ClassMethod KGSearch() As %Status
         If '$IsObject(body) {
             Return ..WriteError("JSON body required", "400 Bad Request")
         }
-        Set res = ##class(ETLWizard.KG.Ingest).Search(body.%Get("corpusId", ""),
+        Set res = ##class(DataIntegrator.KG.Ingest).Search(body.%Get("corpusId", ""),
             body.%Get("question", ""), +body.%Get("topN", 8))
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error, "400 Bad Request")
@@ -2493,7 +2493,7 @@ ClassMethod KGAsk() As %Status
         If '$IsObject(body) {
             Return ..WriteError("JSON body required", "400 Bad Request")
         }
-        Set res = ##class(ETLWizard.KG.Chat).Ask(body.%Get("corpusId", ""), body.%Get("question", ""))
+        Set res = ##class(DataIntegrator.KG.Chat).Ask(body.%Get("corpusId", ""), body.%Get("question", ""))
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error, "400 Bad Request")
         }
@@ -2506,7 +2506,7 @@ ClassMethod KGAsk() As %Status
 ClassMethod KGAskPoll(id As %String) As %Status
 {
     Try {
-        Set res = ##class(ETLWizard.KG.Chat).Poll(id)
+        Set res = ##class(DataIntegrator.KG.Chat).Poll(id)
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error, "404 Not Found")
         }
@@ -2523,7 +2523,7 @@ ClassMethod KGAskPoll(id As %String) As %Status
 ClassMethod KGModels() As %Status
 {
     Try {
-        Return ..WriteJSON(##class(ETLWizard.KG.Models).List())
+        Return ..WriteJSON(##class(DataIntegrator.KG.Models).List())
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -2539,9 +2539,9 @@ ClassMethod KGSelectModel() As %Status
         Set role = $ZStrip(body.%Get("role", "chat"), "<>W")
         Set model = $ZStrip(body.%Get("model", ""), "<>W")
         If role = "extract" {
-            Set err = ##class(ETLWizard.KG.Setup).SetExtractModel(model)
+            Set err = ##class(DataIntegrator.KG.Setup).SetExtractModel(model)
         } Else {
-            Set err = ##class(ETLWizard.KG.Setup).SetChatModel(model)
+            Set err = ##class(DataIntegrator.KG.Setup).SetChatModel(model)
         }
         If err '= "" {
             Return ..WriteError(err, "400 Bad Request")
@@ -2555,7 +2555,7 @@ ClassMethod KGSelectModel() As %Status
 // ------------------------------------------------------------------ MCP tab
 //
 // Publishing target tables as MCP tools (mds/mcp-tab-plan.md). Every route is
-// a thin wrapper over ETLWizard.MCP.Publisher, which owns the validation - the
+// a thin wrapper over DataIntegrator.MCP.Publisher, which owns the validation - the
 // published tools are reachable by an MCP client with no approval step, so the
 // guard belongs in one place and not in the request handler.
 
@@ -2563,7 +2563,7 @@ ClassMethod KGSelectModel() As %Status
 ClassMethod MCPPublishable() As %Status
 {
     Try {
-        Return ..WriteJSON({"tables": (##class(ETLWizard.MCP.Publisher).ListPublishable())})
+        Return ..WriteJSON({"tables": (##class(DataIntegrator.MCP.Publisher).ListPublishable())})
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -2581,7 +2581,7 @@ ClassMethod MCPPropose() As %Status
         If table = "" {
             Return ..WriteError("table is required", "400 Bad Request")
         }
-        Set res = ##class(ETLWizard.MCP.Publisher).ProposeTools(table)
+        Set res = ##class(DataIntegrator.MCP.Publisher).ProposeTools(table)
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error, "400 Bad Request")
         }
@@ -2604,7 +2604,7 @@ ClassMethod MCPPublish() As %Status
         If '$IsObject(tools) || (tools.%Size() = 0) {
             Return ..WriteError("pick at least one tool to publish", "400 Bad Request")
         }
-        Set res = ##class(ETLWizard.MCP.Publisher).Publish(tools)
+        Set res = ##class(DataIntegrator.MCP.Publisher).Publish(tools)
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error, "400 Bad Request")
         }
@@ -2618,7 +2618,7 @@ ClassMethod MCPPublish() As %Status
 ClassMethod MCPPublished() As %Status
 {
     Try {
-        Return ..WriteJSON(##class(ETLWizard.MCP.Publisher).Published())
+        Return ..WriteJSON(##class(DataIntegrator.MCP.Publisher).Published())
     } Catch ex {
         Return ..WriteError(ex.DisplayString())
     }
@@ -2641,7 +2641,7 @@ ClassMethod MCPTest() As %Status
         // thing that makes testing an edit meaningful.
         Set tool = body.%Get("tool")
         If $IsObject(tool) {
-            Set res = ##class(ETLWizard.MCP.Publisher).PreviewTool(tool, args)
+            Set res = ##class(DataIntegrator.MCP.Publisher).PreviewTool(tool, args)
             If res.%Get("error", "") '= "" {
                 Return ..WriteError(res.error, "400 Bad Request")
             }
@@ -2651,7 +2651,7 @@ ClassMethod MCPTest() As %Status
         If name = "" {
             Return ..WriteError("name or tool is required", "400 Bad Request")
         }
-        Set res = ##class(ETLWizard.MCP.Publisher).TestTool(name, args)
+        Set res = ##class(DataIntegrator.MCP.Publisher).TestTool(name, args)
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error, "400 Bad Request")
         }
@@ -2673,7 +2673,7 @@ ClassMethod MCPUnpublish() As %Status
         If name = "" {
             Return ..WriteError("name is required", "400 Bad Request")
         }
-        Set res = ##class(ETLWizard.MCP.Publisher).Unpublish(name)
+        Set res = ##class(DataIntegrator.MCP.Publisher).Unpublish(name)
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error, "400 Bad Request")
         }
@@ -2687,7 +2687,7 @@ ClassMethod MCPUnpublish() As %Status
 ClassMethod MCPClear() As %Status
 {
     Try {
-        Set res = ##class(ETLWizard.MCP.Publisher).Clear()
+        Set res = ##class(DataIntegrator.MCP.Publisher).Clear()
         If res.%Get("error", "") '= "" {
             Return ..WriteError(res.error)
         }
@@ -2739,19 +2739,19 @@ ClassMethod DemoCustomers() As %Status
 ClassMethod GetRuns(id As %String) As %Status
 {
     Try {
-        Set pipeline = ##class(ETLWizard.Model.Pipeline).%OpenId(id)
+        Set pipeline = ##class(DataIntegrator.Model.Pipeline).%OpenId(id)
         If '$IsObject(pipeline) {
             Return ..WriteError("pipeline not found: " _ id, "404 Not Found")
         }
         Set runs = []
         Set stmt = ##class(%SQL.Statement).%New()
-        Set sc = stmt.%Prepare("SELECT TOP 50 ID FROM ETLWizard_Model.Run WHERE Pipeline = ? ORDER BY ID DESC")
+        Set sc = stmt.%Prepare("SELECT TOP 50 ID FROM DataIntegrator_Model.Run WHERE Pipeline = ? ORDER BY ID DESC")
         If $$$ISERR(sc) {
             Return ..WriteError($System.Status.GetErrorText(sc))
         }
         Set rs = stmt.%Execute(id)
         While rs.%Next() {
-            Set run = ##class(ETLWizard.Model.Run).%OpenId(rs.ID)
+            Set run = ##class(DataIntegrator.Model.Run).%OpenId(rs.ID)
             If '$IsObject(run) {
                 Continue
             }
@@ -2772,7 +2772,7 @@ ClassMethod GetRuns(id As %String) As %Status
 ClassMethod GetGraph(id As %String) As %Status
 {
     Try {
-        Set pipeline = ##class(ETLWizard.Model.Pipeline).%OpenId(id)
+        Set pipeline = ##class(DataIntegrator.Model.Pipeline).%OpenId(id)
         If '$IsObject(pipeline) {
             Return ..WriteError("pipeline not found: " _ id, "404 Not Found")
         }
@@ -2780,7 +2780,7 @@ ClassMethod GetGraph(id As %String) As %Status
         Set edges = []
 
         Set stmt = ##class(%SQL.Statement).%New()
-        Set sc = stmt.%Prepare("SELECT ID FROM ETLWizard_Model.Node WHERE Pipeline = ? ORDER BY ID")
+        Set sc = stmt.%Prepare("SELECT ID FROM DataIntegrator_Model.Node WHERE Pipeline = ? ORDER BY ID")
         If $$$ISERR(sc) {
             Return ..WriteError($System.Status.GetErrorText(sc))
         }
@@ -2789,7 +2789,7 @@ ClassMethod GetGraph(id As %String) As %Status
             Return ..WriteError("SQLCODE " _ rs.%SQLCODE _ ": " _ rs.%Message)
         }
         While rs.%Next() {
-            Set node = ##class(ETLWizard.Model.Node).%OpenId(rs.ID)
+            Set node = ##class(DataIntegrator.Model.Node).%OpenId(rs.ID)
             If '$IsObject(node) {
                 Continue
             }
@@ -2797,7 +2797,7 @@ ClassMethod GetGraph(id As %String) As %Status
         }
 
         Set stmt2 = ##class(%SQL.Statement).%New()
-        Set sc = stmt2.%Prepare("SELECT ID FROM ETLWizard_Model.Edge WHERE Pipeline = ? ORDER BY ID")
+        Set sc = stmt2.%Prepare("SELECT ID FROM DataIntegrator_Model.Edge WHERE Pipeline = ? ORDER BY ID")
         If $$$ISERR(sc) {
             Return ..WriteError($System.Status.GetErrorText(sc))
         }
@@ -2806,7 +2806,7 @@ ClassMethod GetGraph(id As %String) As %Status
             Return ..WriteError("SQLCODE " _ rs2.%SQLCODE _ ": " _ rs2.%Message)
         }
         While rs2.%Next() {
-            Set edge = ##class(ETLWizard.Model.Edge).%OpenId(rs2.ID)
+            Set edge = ##class(DataIntegrator.Model.Edge).%OpenId(rs2.ID)
             If '$IsObject(edge) {
                 Continue
             }

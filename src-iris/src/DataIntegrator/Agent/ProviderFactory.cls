@@ -1,9 +1,9 @@
 /// Resolves %AI.Provider instances from the IRIS Config Store (spec §4.1, §27.1).
 /// This is the ONLY place provider wiring happens, so AI Hub EAP churn is
 /// absorbed here. Profiles are Config Store entries named AI.LLM.<configName>:
-///   {"model_provider":"nim","model":"etlwizard-qwen","base_url":"http://host.docker.internal:11434/v1"}
+///   {"model_provider":"nim","model":"dataintegrator-qwen","base_url":"http://host.docker.internal:11434/v1"}
 ///   {"model_provider":"anthropic","model":"claude-...","api_key":"secret://..."}
-Class ETLWizard.Agent.ProviderFactory Extends %RegisteredObject
+Class DataIntegrator.Agent.ProviderFactory Extends %RegisteredObject
 {
 
 ClassMethod GetProviderForConfig(configName As %String, Output provider As %RegisteredObject, Output model As %String) As %Status

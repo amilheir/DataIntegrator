@@ -1,14 +1,14 @@
 /// Interoperability Production tools (spec v2.2 §10.2). All pipelines share
-/// ONE production — ETLWizard.Prod.Main — and each deployed pipeline appends
+/// ONE production — DataIntegrator.Prod.Main — and each deployed pipeline appends
 /// its own item group: <base>_Extract (Business Service, poll schedule),
 /// <base>_Orchestrate (Business Process), <base>_Load (Business Operation).
 /// The user sees every ETL side by side in the Production Configuration page,
 /// each with its own messages and Visual Trace.
 /// Generation/lifecycle verbs are gated by requires_auth.
-Class ETLWizard.Tools.Production Extends %AI.Tool [ DependsOn = (ETLWizard.Tools.Util, ETLWizard.Host.ExtractService, ETLWizard.Host.Orchestrator, ETLWizard.Host.LoadOperation) ]
+Class DataIntegrator.Tools.Production Extends %AI.Tool [ DependsOn = (DataIntegrator.Tools.Util, DataIntegrator.Host.ExtractService, DataIntegrator.Host.Orchestrator, DataIntegrator.Host.LoadOperation) ]
 {
 
-Parameter PRODCLASS = "ETLWizard.Prod.Main";
+Parameter PRODCLASS = "DataIntegrator.Prod.Main";
 
 /// Create the shared production class once, programmatically. It deliberately
 /// has NO source file in the repo: the production items live in the class
@@ -21,14 +21,14 @@ ClassMethod EnsureMainProduction() As %String [ Internal ]
             Return ""
         }
         Set nl = $Char(10)
-        Set src = "/// The single shared ETL Wizard production. Every deployed pipeline appends" _ nl
+        Set src = "/// The single shared Data Integrator production. Every deployed pipeline appends" _ nl
         Set src = src _ "/// its own <base>_Extract / <base>_Orchestrate / <base>_Load items here." _ nl
-        Set src = src _ "/// Created programmatically by ETLWizard.Tools.Production - do not add a" _ nl
+        Set src = src _ "/// Created programmatically by DataIntegrator.Tools.Production - do not add a" _ nl
         Set src = src _ "/// source file for it (recompiling an empty source wipes the items)." _ nl
         Set src = src _ "Class " _ ..#PRODCLASS _ " Extends Ens.Production" _ nl _ "{" _ nl _ nl
         Set src = src _ "XData ProductionDefinition" _ nl _ "{" _ nl
         Set src = src _ "<Production Name=""" _ ..#PRODCLASS _ """ LogGeneralTraceEvents=""false"">" _ nl
-        Set src = src _ "  <Description>ETL Wizard shared production - one item group per pipeline</Description>" _ nl
+        Set src = src _ "  <Description>Data Integrator shared production - one item group per pipeline</Description>" _ nl
         Set src = src _ "  <ActorPoolSize>2</ActorPoolSize>" _ nl
         Set src = src _ "</Production>" _ nl _ "}" _ nl _ nl _ "}" _ nl
         Set stream = ##class(%Stream.TmpCharacter).%New()
@@ -93,7 +93,7 @@ ClassMethod BuildSchedule(days As %String = "", times As %String = "") As %Strin
 }
 
 /// Add (or refresh) this pipeline's item group on the shared production
-/// ETLWizard.Prod.Main. When scheduleSpec is set the Extract service runs on
+/// DataIntegrator.Prod.Main. When scheduleSpec is set the Extract service runs on
 /// that wall-clock schedule (large CallInterval, fire-once-per-window);
 /// otherwise it polls every callIntervalSecs. Records the host nodes.
 ///
@@ -104,12 +104,12 @@ ClassMethod BuildSchedule(days As %String = "", times As %String = "") As %Strin
 Method GenerateProduction(runId As %String, callIntervalSecs As %Integer = 300, scheduleSpec As %String = "", poolSize As %Integer = 1) As %String
 {
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return "ERROR: run not found: " _ runId
         }
         Set pipeline = run.Pipeline
-        Set err = ##class(ETLWizard.Runtime.Executor).ParsePlan(pipeline, .baseName, .foreignTable, .wmColumn, .mode)
+        Set err = ##class(DataIntegrator.Runtime.Executor).ParsePlan(pipeline, .baseName, .foreignTable, .wmColumn, .mode)
         If err '= "" {
             Return err
         }
@@ -144,7 +144,7 @@ Method GenerateProduction(runId As %String, callIntervalSecs As %Integer = 300, 
         // <base>_Extract: Business Service polling on the schedule
         Set svc = ##class(Ens.Config.Item).%New()
         Set svc.Name = svcName
-        Set svc.ClassName = "ETLWizard.Host.ExtractService"
+        Set svc.ClassName = "DataIntegrator.Host.ExtractService"
         Set svc.PoolSize = 1
         Set svc.Enabled = 1
         Do ..AddSetting(svc, "Host", "PipelineId", pipeline.%Id())
@@ -162,7 +162,7 @@ Method GenerateProduction(runId As %String, callIntervalSecs As %Integer = 300, 
         // <base>_Orchestrate: Business Process
         Set bp = ##class(Ens.Config.Item).%New()
         Set bp.Name = bpName
-        Set bp.ClassName = "ETLWizard.Host.Orchestrator"
+        Set bp.ClassName = "DataIntegrator.Host.Orchestrator"
         Set bp.PoolSize = poolSize
         Set bp.Enabled = 1
         Do ..AddSetting(bp, "Host", "LoadTarget", opName)
@@ -171,7 +171,7 @@ Method GenerateProduction(runId As %String, callIntervalSecs As %Integer = 300, 
         // <base>_Load: Business Operation
         Set op = ##class(Ens.Config.Item).%New()
         Set op.Name = opName
-        Set op.ClassName = "ETLWizard.Host.LoadOperation"
+        Set op.ClassName = "DataIntegrator.Host.LoadOperation"
         Set op.PoolSize = poolSize
         Set op.Enabled = 1
         Do prodConfig.Items.Insert(op)
@@ -182,9 +182,9 @@ Method GenerateProduction(runId As %String, callIntervalSecs As %Integer = 300, 
         }
 
         // Persist/refresh the Production model row
-        Set prod = ##class(ETLWizard.Model.Production).PipelineIdxOpen(pipeline.%Id())
+        Set prod = ##class(DataIntegrator.Model.Production).PipelineIdxOpen(pipeline.%Id())
         If '$IsObject(prod) {
-            Set prod = ##class(ETLWizard.Model.Production).%New()
+            Set prod = ##class(DataIntegrator.Model.Production).%New()
             Set prod.Pipeline = pipeline
         }
         Set prod.ProductionClass = ..#PRODCLASS
@@ -196,10 +196,10 @@ Method GenerateProduction(runId As %String, callIntervalSecs As %Integer = 300, 
         }
 
         // Catalog host nodes (HostRole/HostItemName)
-        Do ..CatalogHost(run, svcName, "business_service", "ETLWizard.Host.ExtractService", ..#PRODCLASS)
-        Do ..CatalogHost(run, bpName, "business_process", "ETLWizard.Host.Orchestrator", ..#PRODCLASS)
-        Do ..CatalogHost(run, opName, "business_operation", "ETLWizard.Host.LoadOperation", ..#PRODCLASS)
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.created", "",
+        Do ..CatalogHost(run, svcName, "business_service", "DataIntegrator.Host.ExtractService", ..#PRODCLASS)
+        Do ..CatalogHost(run, bpName, "business_process", "DataIntegrator.Host.Orchestrator", ..#PRODCLASS)
+        Do ..CatalogHost(run, opName, "business_operation", "DataIntegrator.Host.LoadOperation", ..#PRODCLASS)
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.created", "",
             {"kind": "production", "name": (..#PRODCLASS), "items": [(svcName), (bpName), (opName)],
              "callIntervalSecs": (callIntervalSecs), "poolSize": (poolSize)})
 
@@ -216,11 +216,11 @@ Method GenerateProduction(runId As %String, callIntervalSecs As %Integer = 300, 
 ClassMethod RemovePipelineItems(pipelineId As %String) As %String
 {
     Try {
-        Set pipeline = ##class(ETLWizard.Model.Pipeline).%OpenId(pipelineId)
+        Set pipeline = ##class(DataIntegrator.Model.Pipeline).%OpenId(pipelineId)
         If '$IsObject(pipeline) {
             Return ""
         }
-        Set prod = ##class(ETLWizard.Model.Production).PipelineIdxOpen(pipelineId)
+        Set prod = ##class(DataIntegrator.Model.Production).PipelineIdxOpen(pipelineId)
         Set names = ""
         If $IsObject(prod) {
             Try {
@@ -288,7 +288,7 @@ ClassMethod ConfigureSampleDataFeed(callIntervalSecs As %Integer = 60, employees
         }
         Set op = ##class(Ens.Config.Item).%New()
         Set op.Name = opName
-        Set op.ClassName = "ETLWizard.Host.SampleDataOperation"
+        Set op.ClassName = "DataIntegrator.Host.SampleDataOperation"
         Set op.PoolSize = 1
         Set op.Enabled = 1
         Do ..AddSetting(op, "Host", "Employees", employees)
@@ -301,7 +301,7 @@ ClassMethod ConfigureSampleDataFeed(callIntervalSecs As %Integer = 60, employees
 
         Set svc = ##class(Ens.Config.Item).%New()
         Set svc.Name = svcName
-        Set svc.ClassName = "ETLWizard.Host.SampleDataTick"
+        Set svc.ClassName = "DataIntegrator.Host.SampleDataTick"
         Set svc.PoolSize = 1
         Set svc.Enabled = 1
         Do ..AddSetting(svc, "Host", "TargetOperation", opName)
@@ -415,7 +415,7 @@ Method ApplyProduction(runId As %String) As %String
         Do prod.%Save()
         Set run.Pipeline.Status = "Deployed"
         Do run.Pipeline.%Save()
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "",
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "",
             {"name": (..#PRODCLASS), "status": "running", "hostRole": "production"})
         Return "Shared production " _ ..#PRODCLASS _ " is running with this pipeline's items enabled. " _
                "Runs fire on the poll schedule; use RunProductionNow for an immediate run."
@@ -458,7 +458,7 @@ Method StopProduction(runId As %String) As %String
         }
         Set prod.Status = "stopped"
         Do prod.%Save()
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "",
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "",
             {"name": (..#PRODCLASS), "status": "pipeline items disabled", "items": (changed)})
         Return "Disabled " _ changed _ " item(s) of this pipeline on " _ ..#PRODCLASS _ " - other pipelines are unaffected."
     } Catch ex {
@@ -498,7 +498,7 @@ Method RunProductionNow(runId As %String) As %String
 }
 
 /// $List of this pipeline's item names (service first) from ConfigJson.
-ClassMethod ItemNames(prod As ETLWizard.Model.Production) As %List [ Internal, Private ]
+ClassMethod ItemNames(prod As DataIntegrator.Model.Production) As %List [ Internal, Private ]
 {
     Set names = ""
     Try {
@@ -522,25 +522,25 @@ ClassMethod AddSetting(item As Ens.Config.Item, target As %String, name As %Stri
 }
 
 /// Resolve the run -> pipeline -> Production row. Returns "" or error text.
-ClassMethod GetProduction(runId As %String, Output run As ETLWizard.Model.Run, Output prod As ETLWizard.Model.Production) As %String [ Internal, Private ]
+ClassMethod GetProduction(runId As %String, Output run As DataIntegrator.Model.Run, Output prod As DataIntegrator.Model.Production) As %String [ Internal, Private ]
 {
-    Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+    Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
     If '$IsObject(run) {
         Return "ERROR: run not found: " _ runId
     }
-    Set prod = ##class(ETLWizard.Model.Production).PipelineIdxOpen(run.Pipeline.%Id())
+    Set prod = ##class(DataIntegrator.Model.Production).PipelineIdxOpen(run.Pipeline.%Id())
     If '$IsObject(prod) {
         Return "ERROR: no production items for this pipeline - call GenerateProduction first"
     }
     Return ""
 }
 
-ClassMethod CatalogHost(run As ETLWizard.Model.Run, itemName As %String, role As %String, className As %String, prodClass As %String) [ Internal, Private ]
+ClassMethod CatalogHost(run As DataIntegrator.Model.Run, itemName As %String, role As %String, className As %String, prodClass As %String) [ Internal, Private ]
 {
     Try {
-        Set node = ##class(ETLWizard.Model.Node).PipelineNameIdxOpen(run.Pipeline.%Id(), itemName)
+        Set node = ##class(DataIntegrator.Model.Node).PipelineNameIdxOpen(run.Pipeline.%Id(), itemName)
         If '$IsObject(node) {
-            Set node = ##class(ETLWizard.Model.Node).%New()
+            Set node = ##class(DataIntegrator.Model.Node).%New()
             Set node.Pipeline = run.Pipeline
             Set node.Name = itemName
         }
@@ -551,7 +551,7 @@ ClassMethod CatalogHost(run As ETLWizard.Model.Run, itemName As %String, role As
         Set node.ConfigJson = {"production": (prodClass)}.%ToJSON()
         Set node.GraphStatus = "generated"
         Do node.%Save()
-        Do ##class(ETLWizard.Model.Event).Append(run.%Id(), "node.created", node.%Id(),
+        Do ##class(DataIntegrator.Model.Event).Append(run.%Id(), "node.created", node.%Id(),
             {"nodeId": (node.%Id()), "kind": "host", "name": (itemName)})
     } Catch {
     }

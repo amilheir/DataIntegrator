@@ -3,37 +3,37 @@ zn "%SYS"
 // Dev convenience — remove for production use
 do ##class(Security.Users).UnExpireUserPasswords("*")
 
-// Create the ETLWIZARD namespace + web applications
+// Create the DATAINTEGRATOR namespace + web applications
 do $SYSTEM.OBJ.Load("/opt/irisbuild/Installer.cls", "ck")
 set sc = ##class(App.Installer).setup()
 if $SYSTEM.Status.IsError(sc) do $SYSTEM.Status.DisplayError(sc) halt
 
-zn "ETLWIZARD"
+zn "DATAINTEGRATOR"
 
 // AI Hub build 161+ compile-order rule: the ToolSet specification compiler
 // validates <Include Class> targets at compile time, so load everything
 // first without compiling, compile the package, then recompile the ToolSet last.
 do $system.OBJ.LoadDir("/opt/irisbuild/src", "k", , 1)
-do $system.OBJ.CompilePackage("ETLWizard", "ck")
-do $system.OBJ.Compile("ETLWizard.Tools.Main", "ck")
+do $system.OBJ.CompilePackage("DataIntegrator", "ck")
+do $system.OBJ.Compile("DataIntegrator.Tools.Main", "ck")
 
-// Config Store / SQL Gateway / RBAC entries live in the ETLWIZARD database, so
+// Config Store / SQL Gateway / RBAC entries live in the DATAINTEGRATOR database, so
 // a fresh durable-data volume starts without them and the agent fails with
-// "ERROR #5809 ... class '%ConfigStore.Configuration', ID 'AI.LLM.ETLWizard'".
+// "ERROR #5809 ... class '%ConfigStore.Configuration', ID 'AI.LLM.DataIntegrator'".
 // Seeding them at build time makes a clean rebuild come up ready to generate.
 // SetAgentModel points BOTH agent profiles at the masthead picker's default,
 // so the dropdown and the seeded config can never disagree on first load.
-do ##class(ETLWizard.Setup).SetAgentModel(##class(ETLWizard.Setup).#DEFAULTAGENTMODEL, .modelerr)
-do ##class(ETLWizard.Setup).CreateGatewayConnection()
-do ##class(ETLWizard.Setup).CreateRoles()
+do ##class(DataIntegrator.Setup).SetAgentModel(##class(DataIntegrator.Setup).#DEFAULTAGENTMODEL, .modelerr)
+do ##class(DataIntegrator.Setup).CreateGatewayConnection()
+do ##class(DataIntegrator.Setup).CreateRoles()
 
 // The MCP endpoint (/mcp/irisaihub) and its service class, so a clean
 // rebuild comes up with the endpoint present. It serves no tools until the
 // MCP Tools tab publishes some, which is the same state as a fresh install.
-do ##class(ETLWizard.MCP.Publisher).EnsureService()
+do ##class(DataIntegrator.MCP.Publisher).EnsureService()
 
 // Knowledge Graph: the embedding config and the ETLW_KG schema, so a clean
 // rebuild has them. The tab also installs on demand, so this is belt and braces.
-do ##class(ETLWizard.KG.Setup).Install(0)
+do ##class(DataIntegrator.KG.Setup).Install(0)
 
 halt

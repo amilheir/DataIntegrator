@@ -2,7 +2,7 @@ Include (%AI, %occStatus)
 
 /// Math Tool - Basic arithmetic operations
 /// General-purpose tool that can be used in agents, MCP services, or any tool-based integration
-Class ETLWizard.ToolSet.Tools.Math Extends %AI.Tool
+Class DataIntegrator.ToolSet.Tools.Math Extends %AI.Tool
 {
 /// Display name for this tool provider
 Property Name As %String [ InitialExpression = "Math" ];

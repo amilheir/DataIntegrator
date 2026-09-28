@@ -1,13 +1,13 @@
 /// The ETL/ELT architect agent (spec §10.1) — declarative %AI.Agent subclass.
-/// The provider is resolved by name from the Config Store (AI.LLM.ETLWizard),
+/// The provider is resolved by name from the Config Store (AI.LLM.DataIntegrator),
 /// so switching local Ollama <-> cloud profiles requires no code change (§27).
-Class ETLWizard.Agent.Architect Extends %AI.Agent
+Class DataIntegrator.Agent.Architect Extends %AI.Agent
 {
 
-/// Config Store entry: AI.LLM.ETLWizard (see ETLWizard.Setup)
-Parameter MODELCONFIGNAME = "ETLWizard";
+/// Config Store entry: AI.LLM.DataIntegrator (see DataIntegrator.Setup)
+Parameter MODELCONFIGNAME = "DataIntegrator";
 
-Parameter TOOLSETS = "ETLWizard.Tools.Main";
+Parameter TOOLSETS = "DataIntegrator.Tools.Main";
 
 XData INSTRUCTIONS [ MimeType = text/markdown ]
 {
@@ -79,7 +79,7 @@ Method %OnInit() As %Status
     Set sc = $$$OK
     Try {
         If ..Provider = "" {
-            Set sc = ##class(ETLWizard.Agent.ProviderFactory).GetProviderForConfig(..#MODELCONFIGNAME, .provider, .model)
+            Set sc = ##class(DataIntegrator.Agent.ProviderFactory).GetProviderForConfig(..#MODELCONFIGNAME, .provider, .model)
             If $$$ISERR(sc) {
                 Return sc
             }

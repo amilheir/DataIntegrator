@@ -3,7 +3,7 @@
 /// WHERE the batched text goes is `Emit()`, and that is the only thing the two
 /// chats differ in: the ETL agent appends `agent.delta` events to the run log
 /// (this class), and the Knowledge Base chat updates its own Ask row
-/// (ETLWizard.KG.AskSink). The batching and the reasoning filter - the parts
+/// (DataIntegrator.KG.AskSink). The batching and the reasoning filter - the parts
 /// that are easy to get subtly wrong - are written once, here.
 ///
 /// `%AI.Agent.StreamChat(session, input, callbackObj, callbackMethod)` calls
@@ -18,7 +18,7 @@
 /// them. An append happens only when BOTH enough characters have accumulated
 /// AND enough time has passed, so a fast model is batched and a slow one still
 /// appears to move.
-Class ETLWizard.Agent.StreamSink Extends %RegisteredObject
+Class DataIntegrator.Agent.StreamSink Extends %RegisteredObject
 {
 
 /// Run whose event log receives the deltas
@@ -96,7 +96,7 @@ Method OnChunk(chunk As %String)
         // arrives whole in the final record, streamed or not. Reported only
         // where there IS a run log - a sink writing somewhere else has none.
         If ..RunId '= "" {
-            Do ##class(ETLWizard.Model.Event).Append(..RunId, "run.error", "",
+            Do ##class(DataIntegrator.Model.Event).Append(..RunId, "run.error", "",
                 {"error": ("streaming callback failed: " _ ex.DisplayString()), "fatal": 0})
         }
     }
@@ -111,7 +111,7 @@ Method OnChunk(chunk As %String)
 /// see ..Text, which is kept for exactly that.
 Method Emit(text As %String)
 {
-    Do ##class(ETLWizard.Model.Event).Append(..RunId, "agent.delta", "",
+    Do ##class(DataIntegrator.Model.Event).Append(..RunId, "agent.delta", "",
         {"role": "assistant", "turn": (..Turn), "text": (text)})
 }
 

@@ -3,7 +3,7 @@ Include %occStatus
 /// LINK-KG entity and relationship extraction for the Knowledge Graph tab
 /// (mds/knowledge-graph-tab-plan.md §5.5).
 ///
-/// Deliberately TOOL-FREE, like ETLWizard.Agent.SqlGen and for the same reason:
+/// Deliberately TOOL-FREE, like DataIntegrator.Agent.SqlGen and for the same reason:
 /// a focused single-purpose call is far faster and more reliable on a local
 /// model than the 40-tool architect loop.
 ///
@@ -12,7 +12,7 @@ Include %occStatus
 /// established name instead of inventing a variant - which is what stops one
 /// real-world thing fragmenting into "Acme", "ACME Corp" and "Acme Corporation"
 /// as three unrelated nodes.
-Class ETLWizard.Agent.GraphExtract Extends %RegisteredObject
+Class DataIntegrator.Agent.GraphExtract Extends %RegisteredObject
 {
 
 /// How many known entity names to feed back into a call. wikigraph sends 50;
@@ -38,13 +38,13 @@ ClassMethod Extract(text As %String, label As %String = "", known As %DynamicArr
         }
         // The PROVIDER (endpoint, provider class) comes from the shared profile;
         // the MODEL is the KG tab's own choice. A third AI.LLM.* profile is not
-        // possible on this build - see ETLWizard.KG.Setup.GetChatModel.
-        Set sc = ##class(ETLWizard.Agent.ProviderFactory).GetProviderForConfig("ETLWizard", .provider, .model)
+        // possible on this build - see DataIntegrator.KG.Setup.GetChatModel.
+        Set sc = ##class(DataIntegrator.Agent.ProviderFactory).GetProviderForConfig("DataIntegrator", .provider, .model)
         If $$$ISERR(sc) {
-            Return {"error": ("no LLM profile (AI.LLM.ETLWizard): " _ $System.Status.GetErrorText(sc))}
+            Return {"error": ("no LLM profile (AI.LLM.DataIntegrator): " _ $System.Status.GetErrorText(sc))}
         }
         Set agent = ##class(%AI.Agent).%New(provider)
-        Set model = ##class(ETLWizard.KG.Setup).GetExtractModel()
+        Set model = ##class(DataIntegrator.KG.Setup).GetExtractModel()
         // Without this the provider falls back to its own default and the call
         // dies with "model 'meta/llama-4-scout' not found".
         If model '= "" {
@@ -54,7 +54,7 @@ ClassMethod Extract(text As %String, label As %String = "", known As %DynamicArr
         Set session = agent.CreateSession()
         Set response = agent.Chat(session, ..Prompt(text, label, known))
         Set raw = $Select($IsObject(response): response.Content, 1: "")
-        Set elapsed = ##class(ETLWizard.KG.Setup).Round($ZHorolog - start, 2)
+        Set elapsed = ##class(DataIntegrator.KG.Setup).Round($ZHorolog - start, 2)
 
         Set parsed = ..ParseJson(raw)
         If parsed.%Get("error", "") '= "" {

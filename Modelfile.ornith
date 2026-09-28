@@ -1,7 +1,7 @@
 # 8192-context build of ornith-1.5:9b for the frontend model picker.
 #
-# Build with: ollama create etlwizard-ornith -f Modelfile.ornith
-#   docker exec irisetlwizard-ollama-1 ollama create etlwizard-ornith -f /Modelfile.ornith
+# Build with: ollama create dataintegrator-ornith -f Modelfile.ornith
+#   docker exec dataintegrator-ollama-1 ollama create dataintegrator-ornith -f /Modelfile.ornith
 #
 # Requires Ollama >= 0.31 to pull the base model; 0.30.10 returns
 # "412: requires a newer version of Ollama" on `ollama pull ornith-1.5:9b`.

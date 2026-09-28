@@ -4,7 +4,7 @@
 /// Layer naming per spec §6.1/§22: ETLW_LANDING.<base>_raw,
 /// ETLW_STAGING.<base>_delta, ETLW_TARGET.<base>.
 /// Watermarks are updated only on success (spec §7).
-Class ETLWizard.Tools.Load Extends %AI.Tool [ DependsOn = ETLWizard.Tools.Util ]
+Class DataIntegrator.Tools.Load Extends %AI.Tool [ DependsOn = DataIntegrator.Tools.Util ]
 {
 
 /// Create the landing, staging and target tables for a pipeline from the
@@ -13,7 +13,7 @@ Class ETLWizard.Tools.Load Extends %AI.Tool [ DependsOn = ETLWizard.Tools.Util ]
 Method CreateLayerTables(runId As %String, baseName As %String, foreignTable As %String, pkColumns As %String) As %String
 {
     Try {
-        Set util = "ETLWizard.Tools.Util"
+        Set util = "DataIntegrator.Tools.Util"
         If '$ClassMethod(util, "ValidIdent", baseName) {
             Return "ERROR: invalid baseName"
         }
@@ -58,8 +58,8 @@ Method CreateLayerTables(runId As %String, baseName As %String, foreignTable As 
         Do $ClassMethod(util, "CatalogNode", runId, "target", target, ddlTarget, "")
 
         // Lineage edges FT -> landing -> staging -> target (best effort)
-        Set cat = ##class(ETLWizard.Tools.Catalog).%New()
-        Do cat.CatalogLink(runId, "ETLWIZARD." _ foreignTable, landing, "Extract")
+        Set cat = ##class(DataIntegrator.Tools.Catalog).%New()
+        Do cat.CatalogLink(runId, "DATAINTEGRATOR." _ foreignTable, landing, "Extract")
         Do cat.CatalogLink(runId, landing, staging, "Delta")
         Do cat.CatalogLink(runId, staging, target, "Merge/Upsert")
 
@@ -77,19 +77,19 @@ Method CreateLayerTables(runId As %String, baseName As %String, foreignTable As 
 /// all trigger loads — concurrent runs of the same pipeline must not race.
 Method RunIncrementalLoad(runId As %String, baseName As %String, foreignTable As %String, watermarkColumn As %String) As %String
 {
-    Lock +^ETLWizard.LoadLock(baseName):20
+    Lock +^DataIntegrator.LoadLock(baseName):20
     If '$Test {
         Return "ERROR: another load for '" _ baseName _ "' is already running - try again shortly"
     }
     Set result = ..RunIncrementalLoadInner(runId, baseName, foreignTable, watermarkColumn)
-    Lock -^ETLWizard.LoadLock(baseName)
+    Lock -^DataIntegrator.LoadLock(baseName)
     Return result
 }
 
 Method RunIncrementalLoadInner(runId As %String, baseName As %String, foreignTable As %String, watermarkColumn As %String) As %String [ Internal, Private ]
 {
     Try {
-        Set util = "ETLWizard.Tools.Util"
+        Set util = "DataIntegrator.Tools.Util"
         If '$ClassMethod(util, "ValidIdent", baseName) {
             Return "ERROR: invalid baseName"
         }
@@ -99,7 +99,7 @@ Method RunIncrementalLoadInner(runId As %String, baseName As %String, foreignTab
         If '$ClassMethod(util, "ValidIdent", watermarkColumn) {
             Return "ERROR: invalid watermarkColumn"
         }
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return "ERROR: run not found: " _ runId
         }
@@ -113,7 +113,7 @@ Method RunIncrementalLoadInner(runId As %String, baseName As %String, foreignTab
 
         // Previous watermark (empty = first load, full extract)
         Set prevWm = ""
-        Set wmObj = ##class(ETLWizard.Model.Watermark).PipelineIdxOpen(run.Pipeline.%Id())
+        Set wmObj = ##class(DataIntegrator.Model.Watermark).PipelineIdxOpen(run.Pipeline.%Id())
         If $IsObject(wmObj) {
             Set prevWm = wmObj.LastValue
         }
@@ -121,13 +121,13 @@ Method RunIncrementalLoadInner(runId As %String, baseName As %String, foreignTab
         // 1. Extract into landing. etl_run_id carries a unique per-execution
         // batch id so repeated loads within one wizard run never re-stage
         // earlier batches.
-        Set execId = runId _ "-" _ $Increment(^ETLWizard.ExecSeq)
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (landing), "status": "running"})
+        Set execId = runId _ "-" _ $Increment(^DataIntegrator.ExecSeq)
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (landing), "status": "running"})
         // InsertFromSelect (not RunDML) so an ODBC-linked source, which no
         // set-based INSERT ... SELECT can read, streams through the cursor
         // fallback instead of failing to compile
         Set extractCols = colList _ ", etl_run_id, etl_load_ts, etl_source"
-        Set sql = "SELECT " _ colList _ ", ?, CURRENT_TIMESTAMP, ? FROM ETLWIZARD." _ foreignTable
+        Set sql = "SELECT " _ colList _ ", ?, CURRENT_TIMESTAMP, ? FROM DATAINTEGRATOR." _ foreignTable
         If prevWm '= "" {
             Set sql = sql _ " WHERE " _ watermarkColumn _ " > ?"
             Set res = $ClassMethod(util, "InsertFromSelect", landing, extractCols, sql, execId, foreignTable, prevWm)
@@ -135,11 +135,11 @@ Method RunIncrementalLoadInner(runId As %String, baseName As %String, foreignTab
             Set res = $ClassMethod(util, "InsertFromSelect", landing, extractCols, sql, execId, foreignTable)
         }
         If $Extract(res, 1, 5) = "ERROR" {
-            Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (landing), "status": "failed", "error": (res)})
+            Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (landing), "status": "failed", "error": (res)})
             Return res
         }
         Set rowsExtracted = +$Piece(res, ":", 2)
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (landing), "status": "succeeded", "rowCount": (rowsExtracted)})
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (landing), "status": "succeeded", "rowCount": (rowsExtracted)})
 
         // Nothing new: don't re-stage the previous batch
         If rowsExtracted = 0 {
@@ -156,24 +156,24 @@ Method RunIncrementalLoadInner(runId As %String, baseName As %String, foreignTab
             Return res
         }
         Set rowsStaged = +$Piece(res, ":", 2)
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (staging), "status": "succeeded", "rowCount": (rowsStaged)})
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (staging), "status": "succeeded", "rowCount": (rowsStaged)})
 
         // 3. Upsert into target
         Set res = $ClassMethod(util, "RunDML",
             "INSERT OR UPDATE INTO " _ target _ " (" _ colList _ ", etl_created_at, etl_updated_at) " _
             "SELECT " _ colList _ ", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM " _ staging)
         If $Extract(res, 1, 5) = "ERROR" {
-            Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (target), "status": "failed", "error": (res)})
+            Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (target), "status": "failed", "error": (res)})
             Return res
         }
         Set rowsUpserted = +$Piece(res, ":", 2)
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (target), "status": "succeeded", "rowCount": (rowsUpserted)})
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (target), "status": "succeeded", "rowCount": (rowsUpserted)})
 
         // 4. Advance the watermark (success only, spec §7)
         Set newWm = $ClassMethod(util, "ScalarQuery", "SELECT MAX(" _ watermarkColumn _ ") FROM " _ staging)
         If ($Extract(newWm, 1, 5) '= "ERROR") && (newWm '= "") {
             If '$IsObject(wmObj) {
-                Set wmObj = ##class(ETLWizard.Model.Watermark).%New()
+                Set wmObj = ##class(DataIntegrator.Model.Watermark).%New()
                 Set wmObj.Pipeline = run.Pipeline
                 Set wmObj.Type = "timestamp"
                 Set wmObj.ColumnName = watermarkColumn
@@ -183,7 +183,7 @@ Method RunIncrementalLoadInner(runId As %String, baseName As %String, foreignTab
             Set wmObj.UpdatedAt = $ZDateTime($ZTimeStamp, 3, , 3)
             Set sc = wmObj.%Save()
             If $$$ISOK(sc) {
-                Do ##class(ETLWizard.Model.Event).Append(runId, "watermark.updated", "",
+                Do ##class(DataIntegrator.Model.Event).Append(runId, "watermark.updated", "",
                     {"column": (watermarkColumn), "previous": (prevWm), "current": (newWm)})
             }
         }
@@ -201,19 +201,19 @@ Method RunIncrementalLoadInner(runId As %String, baseName As %String, foreignTab
 /// Serialized per base (see RunIncrementalLoad).
 Method RunFullLoad(runId As %String, baseName As %String, foreignTable As %String) As %String
 {
-    Lock +^ETLWizard.LoadLock(baseName):20
+    Lock +^DataIntegrator.LoadLock(baseName):20
     If '$Test {
         Return "ERROR: another load for '" _ baseName _ "' is already running - try again shortly"
     }
     Set result = ..RunFullLoadInner(runId, baseName, foreignTable)
-    Lock -^ETLWizard.LoadLock(baseName)
+    Lock -^DataIntegrator.LoadLock(baseName)
     Return result
 }
 
 Method RunFullLoadInner(runId As %String, baseName As %String, foreignTable As %String) As %String [ Internal, Private ]
 {
     Try {
-        Set util = "ETLWizard.Tools.Util"
+        Set util = "DataIntegrator.Tools.Util"
         If '$ClassMethod(util, "ValidIdent", baseName) {
             Return "ERROR: invalid baseName"
         }
@@ -231,12 +231,12 @@ Method RunFullLoadInner(runId As %String, baseName As %String, foreignTable As %
         }
         Set res = $ClassMethod(util, "InsertFromSelect", target,
             colList _ ", etl_created_at, etl_updated_at",
-            "SELECT " _ colList _ ", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM ETLWIZARD." _ foreignTable)
+            "SELECT " _ colList _ ", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM DATAINTEGRATOR." _ foreignTable)
         If $Extract(res, 1, 5) = "ERROR" {
             Return res
         }
         Set rows = +$Piece(res, ":", 2)
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (target), "status": "succeeded", "rowCount": (rows)})
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (target), "status": "succeeded", "rowCount": (rows)})
         Return {"rowsLoaded": (rows), "strategy": "full"}.%ToJSON()
     } Catch ex {
         Return "ERROR: " _ ex.DisplayString()
@@ -248,19 +248,19 @@ Method RunFullLoadInner(runId As %String, baseName As %String, foreignTable As %
 /// Serialized per base (see RunIncrementalLoad).
 Method RunSnapshotLoad(runId As %String, baseName As %String, foreignTable As %String) As %String
 {
-    Lock +^ETLWizard.LoadLock(baseName):20
+    Lock +^DataIntegrator.LoadLock(baseName):20
     If '$Test {
         Return "ERROR: another load for '" _ baseName _ "' is already running - try again shortly"
     }
     Set result = ..RunSnapshotLoadInner(runId, baseName, foreignTable)
-    Lock -^ETLWizard.LoadLock(baseName)
+    Lock -^DataIntegrator.LoadLock(baseName)
     Return result
 }
 
 Method RunSnapshotLoadInner(runId As %String, baseName As %String, foreignTable As %String) As %String [ Internal, Private ]
 {
     Try {
-        Set util = "ETLWizard.Tools.Util"
+        Set util = "DataIntegrator.Tools.Util"
         If '$ClassMethod(util, "ValidIdent", baseName) {
             Return "ERROR: invalid baseName"
         }
@@ -272,7 +272,7 @@ Method RunSnapshotLoadInner(runId As %String, baseName As %String, foreignTable 
             Return err
         }
         // timestamp + monotonic counter so concurrent/same-second runs never collide
-        Set suffix = $Translate($ZDateTime($ZTimeStamp, 8), " :", "_") _ "_" _ $Increment(^ETLWizard.SnapSeq)
+        Set suffix = $Translate($ZDateTime($ZTimeStamp, 8), " :", "_") _ "_" _ $Increment(^DataIntegrator.SnapSeq)
         Set snap = "ETLW_TARGET." _ baseName _ "_snap_" _ suffix
         Set ddl = "CREATE TABLE " _ snap _ " (" _ ddlDefs _ ", etl_snapshot_at TIMESTAMP)"
         Set res = $ClassMethod(util, "RunDDL", ddl)
@@ -280,13 +280,13 @@ Method RunSnapshotLoadInner(runId As %String, baseName As %String, foreignTable 
             Return res
         }
         Set res = $ClassMethod(util, "InsertFromSelect", snap, colList _ ", etl_snapshot_at",
-            "SELECT " _ colList _ ", CURRENT_TIMESTAMP FROM ETLWIZARD." _ foreignTable)
+            "SELECT " _ colList _ ", CURRENT_TIMESTAMP FROM DATAINTEGRATOR." _ foreignTable)
         If $Extract(res, 1, 5) = "ERROR" {
             Return res
         }
         Set rows = +$Piece(res, ":", 2)
         Do $ClassMethod(util, "CatalogNode", runId, "target", snap, ddl, "")
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (snap), "status": "succeeded", "rowCount": (rows)})
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (snap), "status": "succeeded", "rowCount": (rows)})
         Return {"strategy": "snapshot", "snapshotTable": (snap), "rowsLoaded": (rows)}.%ToJSON()
     } Catch ex {
         Return "ERROR: " _ ex.DisplayString()
@@ -301,19 +301,19 @@ Method RunSnapshotLoadInner(runId As %String, baseName As %String, foreignTable 
 /// Serialized per base (see RunIncrementalLoad).
 Method RunAppendOnlyLoad(runId As %String, baseName As %String, foreignTable As %String, watermarkColumn As %String = "") As %String
 {
-    Lock +^ETLWizard.LoadLock(baseName):20
+    Lock +^DataIntegrator.LoadLock(baseName):20
     If '$Test {
         Return "ERROR: another load for '" _ baseName _ "' is already running - try again shortly"
     }
     Set result = ..RunAppendOnlyLoadInner(runId, baseName, foreignTable, watermarkColumn)
-    Lock -^ETLWizard.LoadLock(baseName)
+    Lock -^DataIntegrator.LoadLock(baseName)
     Return result
 }
 
 Method RunAppendOnlyLoadInner(runId As %String, baseName As %String, foreignTable As %String, watermarkColumn As %String = "") As %String [ Internal, Private ]
 {
     Try {
-        Set util = "ETLWizard.Tools.Util"
+        Set util = "DataIntegrator.Tools.Util"
         If '$ClassMethod(util, "ValidIdent", baseName) {
             Return "ERROR: invalid baseName"
         }
@@ -323,7 +323,7 @@ Method RunAppendOnlyLoadInner(runId As %String, baseName As %String, foreignTabl
         If (watermarkColumn '= "") && ('$ClassMethod(util, "ValidIdent", watermarkColumn)) {
             Return "ERROR: invalid watermarkColumn"
         }
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return "ERROR: run not found: " _ runId
         }
@@ -333,12 +333,12 @@ Method RunAppendOnlyLoadInner(runId As %String, baseName As %String, foreignTabl
         }
         Set target = "ETLW_TARGET." _ baseName
         Set prevWm = ""
-        Set wmObj = ##class(ETLWizard.Model.Watermark).PipelineIdxOpen(run.Pipeline.%Id())
+        Set wmObj = ##class(DataIntegrator.Model.Watermark).PipelineIdxOpen(run.Pipeline.%Id())
         If $IsObject(wmObj) {
             Set prevWm = wmObj.LastValue
         }
         Set appendCols = colList _ ", etl_created_at, etl_updated_at"
-        Set sql = "SELECT " _ colList _ ", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM ETLWIZARD." _ foreignTable
+        Set sql = "SELECT " _ colList _ ", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM DATAINTEGRATOR." _ foreignTable
         If (watermarkColumn '= "") && (prevWm '= "") {
             Set res = $ClassMethod(util, "InsertFromSelect", target, appendCols, sql _ " WHERE " _ watermarkColumn _ " > ?", prevWm)
         } Else {
@@ -348,7 +348,7 @@ Method RunAppendOnlyLoadInner(runId As %String, baseName As %String, foreignTabl
             Return res
         }
         Set rows = +$Piece(res, ":", 2)
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (target), "status": "succeeded", "rowCount": (rows)})
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (target), "status": "succeeded", "rowCount": (rows)})
         Set newWm = prevWm
         If (watermarkColumn '= "") && (rows > 0) {
             // %EXTERNAL, not a bare MAX(): on a %TimeStamp column IRIS returns the
@@ -361,10 +361,10 @@ Method RunAppendOnlyLoadInner(runId As %String, baseName As %String, foreignTabl
             // timestamp column, because the logical form is a number.
             // %EXTERNAL returns "2026-08-28 18:28:02.039514", which compares
             // correctly and types correctly.
-            Set maxWm = $ClassMethod(util, "ScalarQuery", "SELECT %EXTERNAL(MAX(" _ watermarkColumn _ ")) FROM ETLWIZARD." _ foreignTable)
+            Set maxWm = $ClassMethod(util, "ScalarQuery", "SELECT %EXTERNAL(MAX(" _ watermarkColumn _ ")) FROM DATAINTEGRATOR." _ foreignTable)
             If ($Extract(maxWm, 1, 5) '= "ERROR") && (maxWm '= "") {
                 If '$IsObject(wmObj) {
-                    Set wmObj = ##class(ETLWizard.Model.Watermark).%New()
+                    Set wmObj = ##class(DataIntegrator.Model.Watermark).%New()
                     Set wmObj.Pipeline = run.Pipeline
                     Set wmObj.Type = $Select($IsValidNum(maxWm): "numeric", 1: "timestamp")
                     Set wmObj.ColumnName = watermarkColumn
@@ -375,7 +375,7 @@ Method RunAppendOnlyLoadInner(runId As %String, baseName As %String, foreignTabl
                 Set sc = wmObj.%Save()
                 If $$$ISOK(sc) {
                     Set newWm = maxWm
-                    Do ##class(ETLWizard.Model.Event).Append(runId, "watermark.updated", "",
+                    Do ##class(DataIntegrator.Model.Event).Append(runId, "watermark.updated", "",
                         {"column": (watermarkColumn), "previous": (prevWm), "current": (maxWm)})
                 }
             }
@@ -393,19 +393,19 @@ Method RunAppendOnlyLoadInner(runId As %String, baseName As %String, foreignTabl
 /// baseName and skipped on later runs.
 Method RunCsvArrivalLoad(runId As %String, baseName As %String, csvServerName As %String, columnDefs As %String) As %String
 {
-    Lock +^ETLWizard.LoadLock(baseName):20
+    Lock +^DataIntegrator.LoadLock(baseName):20
     If '$Test {
         Return "ERROR: another load for '" _ baseName _ "' is already running - try again shortly"
     }
     Set result = ..RunCsvArrivalLoadInner(runId, baseName, csvServerName, columnDefs)
-    Lock -^ETLWizard.LoadLock(baseName)
+    Lock -^DataIntegrator.LoadLock(baseName)
     Return result
 }
 
 Method RunCsvArrivalLoadInner(runId As %String, baseName As %String, csvServerName As %String, columnDefs As %String) As %String [ Internal, Private ]
 {
     Try {
-        Set util = "ETLWizard.Tools.Util"
+        Set util = "DataIntegrator.Tools.Util"
         If '$ClassMethod(util, "ValidIdent", baseName) {
             Return "ERROR: invalid baseName"
         }
@@ -446,13 +446,13 @@ Method RunCsvArrivalLoadInner(runId As %String, baseName As %String, csvServerNa
         }
         While rs.Next() {
             Set fileName = rs.Get("ItemName")
-            If $Data(^ETLWizard.CsvProcessed(baseName, fileName)) {
+            If $Data(^DataIntegrator.CsvProcessed(baseName, fileName)) {
                 Continue
             }
             // Remount the per-file foreign table
-            Do $ClassMethod(util, "RunDDL", "DROP FOREIGN TABLE ETLWIZARD." _ ftName)
-            Set ddl = "CREATE FOREIGN TABLE ETLWIZARD." _ ftName _ " (" _ columnDefs _ ")" _
-                      " SERVER ETLWIZARD." _ csvServerName _ " FILE '" _ fileName _ "'" _
+            Do $ClassMethod(util, "RunDDL", "DROP FOREIGN TABLE DATAINTEGRATOR." _ ftName)
+            Set ddl = "CREATE FOREIGN TABLE DATAINTEGRATOR." _ ftName _ " (" _ columnDefs _ ")" _
+                      " SERVER DATAINTEGRATOR." _ csvServerName _ " FILE '" _ fileName _ "'" _
                       " USING {""from"":{""file"":{""header"":1}}}"
             Set res = $ClassMethod(util, "RunDDL", ddl)
             If res '= "" {
@@ -461,18 +461,18 @@ Method RunCsvArrivalLoadInner(runId As %String, baseName As %String, csvServerNa
             }
             Set res = $ClassMethod(util, "RunDML",
                 "INSERT INTO " _ target _ " (" _ colList _ ", etl_created_at, etl_updated_at) " _
-                "SELECT " _ colList _ ", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM ETLWIZARD." _ ftName)
+                "SELECT " _ colList _ ", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM DATAINTEGRATOR." _ ftName)
             If $Extract(res, 1, 5) = "ERROR" {
                 Do files.%Push({"file": (fileName), "error": (res)})
-                Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (fileName), "status": "failed", "error": (res)})
+                Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (fileName), "status": "failed", "error": (res)})
                 Continue
             }
             Set rows = +$Piece(res, ":", 2)
-            Set ^ETLWizard.CsvProcessed(baseName, fileName) = $ZDateTime($ZTimeStamp, 3, , 3)
+            Set ^DataIntegrator.CsvProcessed(baseName, fileName) = $ZDateTime($ZTimeStamp, 3, , 3)
             Set totalRows = totalRows + rows
             Set processed = processed + 1
             Do files.%Push({"file": (fileName), "rows": (rows)})
-            Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "",
+            Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "",
                 {"name": (fileName), "status": "succeeded", "rowCount": (rows)})
         }
         Return {"strategy": "csv_file_arrival", "filesProcessed": (processed),
@@ -488,7 +488,7 @@ Method RunCsvArrivalLoadInner(runId As %String, baseName As %String, csvServerNa
 Method CreateQuarantineTable(runId As %String, baseName As %String, foreignTable As %String) As %String
 {
     Try {
-        Set util = "ETLWizard.Tools.Util"
+        Set util = "DataIntegrator.Tools.Util"
         If '$ClassMethod(util, "ValidIdent", baseName) {
             Return "ERROR: invalid baseName"
         }
@@ -515,7 +515,7 @@ Method CreateQuarantineTable(runId As %String, baseName As %String, foreignTable
 Method RouteInvalidRows(runId As %String, baseName As %String, foreignTable As %String, pkColumn As %String) As %String
 {
     Try {
-        Set util = "ETLWizard.Tools.Util"
+        Set util = "DataIntegrator.Tools.Util"
         If '$ClassMethod(util, "ValidIdent", baseName) {
             Return "ERROR: invalid baseName"
         }
@@ -539,7 +539,7 @@ Method RouteInvalidRows(runId As %String, baseName As %String, foreignTable As %
         If routed > 0 {
             Do $ClassMethod(util, "RunDML", "DELETE FROM " _ staging _ " WHERE " _ pkColumn _ " IS NULL")
         }
-        Do ##class(ETLWizard.Model.Event).Append(runId, "check.result", "",
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "check.result", "",
             {"check": "quarantine_null_pk", "routed": (routed), "table": (quarantine)})
         Return {"rowsQuarantined": (routed), "quarantineTable": (quarantine)}.%ToJSON()
     } Catch ex {
@@ -552,7 +552,7 @@ Method RouteInvalidRows(runId As %String, baseName As %String, foreignTable As %
 /// cleansing, derivation, aggregation and filtering before deploying.
 Method PreviewTransform(transformSql As %String, maxRows As %Integer = 10) As %String
 {
-    Set util = "ETLWizard.Tools.Util"
+    Set util = "DataIntegrator.Tools.Util"
     If '$ClassMethod(util, "IsSelectOnly", transformSql) {
         Return "ERROR: transform must be a single SELECT statement"
     }
@@ -596,7 +596,7 @@ Method PreviewTransform(transformSql As %String, maxRows As %Integer = 10) As %S
 Method DeployTransform(runId As %String, baseName As %String, transformSql As %String, pkColumns As %String = "", sources As %String = "", loadConfig As %String = "") As %String
 {
     Try {
-        Set util = "ETLWizard.Tools.Util"
+        Set util = "DataIntegrator.Tools.Util"
         If '$ClassMethod(util, "ValidIdent", baseName) {
             Return "ERROR: invalid baseName"
         }
@@ -666,28 +666,28 @@ Method DeployTransform(runId As %String, baseName As %String, transformSql As %S
         }
         // Idempotent re-deploy: clear this pipeline's prior graph so a second
         // deploy does not accumulate duplicate / stale (e.g. failed) nodes.
-        Set run0 = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run0 = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If $IsObject(run0) {
             Set pid0 = run0.Pipeline.%Id()
             Set ed = ##class(%SQL.Statement).%New()
-            If $$$ISOK(ed.%Prepare("DELETE FROM ETLWizard_Model.Edge WHERE Pipeline = ?")) { Do ed.%Execute(pid0) }
+            If $$$ISOK(ed.%Prepare("DELETE FROM DataIntegrator_Model.Edge WHERE Pipeline = ?")) { Do ed.%Execute(pid0) }
             Set nd = ##class(%SQL.Statement).%New()
-            If $$$ISOK(nd.%Prepare("DELETE FROM ETLWizard_Model.Node WHERE Pipeline = ?")) { Do nd.%Execute(pid0) }
+            If $$$ISOK(nd.%Prepare("DELETE FROM DataIntegrator_Model.Node WHERE Pipeline = ?")) { Do nd.%Execute(pid0) }
         }
         Set xform = baseName _ "_transform"
         Do $ClassMethod(util, "CatalogNode", runId, "transform_view", xform, transformSql, "")
         Do $ClassMethod(util, "CatalogNode", runId, "staging", staging, "", "")
         Do $ClassMethod(util, "CatalogNode", runId, "target", target, "", "")
-        Set cat = ##class(ETLWizard.Tools.Catalog).%New()
+        Set cat = ##class(DataIntegrator.Tools.Catalog).%New()
         // one foreign_table node per source, so the saved graph shows the Sources
         // cluster (skip any already recorded on this pipeline to avoid dup names)
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         For i = 1:1:$Length(sources, ",") {
             Set src = $ZStrip($Piece(sources, ",", i), "<>W")
             If src = "" {
                 Continue
             }
-            If '$IsObject(##class(ETLWizard.Model.Node).PipelineNameIdxOpen(run.Pipeline.%Id(), src)) {
+            If '$IsObject(##class(DataIntegrator.Model.Node).PipelineNameIdxOpen(run.Pipeline.%Id(), src)) {
                 Do $ClassMethod(util, "CatalogNode", runId, "foreign_table", src, "", "")
             }
             Do cat.CatalogLink(runId, src, xform, "Source")
@@ -714,19 +714,19 @@ Method DeployTransform(runId As %String, baseName As %String, transformSql As %S
 /// serialized per base. Returns stats JSON.
 Method RunTransformLoad(runId As %String, baseName As %String, transformSql As %String, mode As %String = "incremental", watermarkColumn As %String = "") As %String
 {
-    Lock +^ETLWizard.LoadLock(baseName):20
+    Lock +^DataIntegrator.LoadLock(baseName):20
     If '$Test {
         Return "ERROR: another load for '" _ baseName _ "' is already running - try again shortly"
     }
     Set result = ..RunTransformLoadInner(runId, baseName, transformSql, mode, watermarkColumn)
-    Lock -^ETLWizard.LoadLock(baseName)
+    Lock -^DataIntegrator.LoadLock(baseName)
     Return result
 }
 
 Method RunTransformLoadInner(runId As %String, baseName As %String, transformSql As %String, mode As %String, watermarkColumn As %String) As %String [ Internal, Private ]
 {
     Try {
-        Set util = "ETLWizard.Tools.Util"
+        Set util = "DataIntegrator.Tools.Util"
         If '$ClassMethod(util, "ValidIdent", baseName) {
             Return "ERROR: invalid baseName"
         }
@@ -736,7 +736,7 @@ Method RunTransformLoadInner(runId As %String, baseName As %String, transformSql
         If (watermarkColumn '= "") && ('$ClassMethod(util, "ValidIdent", watermarkColumn)) {
             Return "ERROR: invalid watermarkColumn"
         }
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return "ERROR: run not found: " _ runId
         }
@@ -750,14 +750,14 @@ Method RunTransformLoadInner(runId As %String, baseName As %String, transformSql
         // previous watermark (incremental transforms)
         Set prevWm = ""
         Set prevWmType = ""
-        Set wmObj = ##class(ETLWizard.Model.Watermark).PipelineIdxOpen(run.Pipeline.%Id())
+        Set wmObj = ##class(DataIntegrator.Model.Watermark).PipelineIdxOpen(run.Pipeline.%Id())
         If $IsObject(wmObj) {
             Set prevWmType = wmObj.Type
             Set prevWm = wmObj.LastValue
         }
 
         // 1. Rebuild staging from the transform SELECT (join/cleanse/derive/aggregate/filter)
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (baseName _ "_transform"), "status": "running"})
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (baseName _ "_transform"), "status": "running"})
         Do $ClassMethod(util, "RunDML", "TRUNCATE TABLE " _ staging)
         // Insert POSITIONALLY (SELECT *), never by name: colList holds the names
         // we synthesized for the target (col2/col3 for unaliased expressions,
@@ -778,7 +778,7 @@ Method RunTransformLoadInner(runId As %String, baseName As %String, transformSql
             // TIMESTAMP typing, so the bound string is compared against the
             // logical value and matches NOTHING - the run then reports success
             // having loaded zero rows. Measured on 45 genuinely new rows:
-            //   ... FROM ETLWIZARD.ext_orders WHERE ordered_at > ?        -> 45
+            //   ... FROM DATAINTEGRATOR.ext_orders WHERE ordered_at > ?        -> 45
             //   ... FROM (<transform>) etl_t WHERE etl_t.ordered_at > ?   ->  0
             //   ... FROM (<transform>) etl_t WHERE ... > CAST(? AS TIMESTAMP) -> 45
             // A numeric watermark must NOT be cast, hence the type test.
@@ -789,11 +789,11 @@ Method RunTransformLoadInner(runId As %String, baseName As %String, transformSql
             Set res = $ClassMethod(util, "InsertFromSelect", staging, colList, stageSelect)
         }
         If $Extract(res, 1, 5) = "ERROR" {
-            Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (baseName _ "_transform"), "status": "failed", "error": (res)})
+            Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (baseName _ "_transform"), "status": "failed", "error": (res)})
             Return res
         }
         Set rowsStaged = +$Piece(res, ":", 2)
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (staging), "status": "succeeded", "rowCount": (rowsStaged)})
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (staging), "status": "succeeded", "rowCount": (rowsStaged)})
 
         If rowsStaged = 0 {
             Return {"strategy": "transform", "rowsStaged": 0, "rowsLoaded": 0,
@@ -847,7 +847,7 @@ Method RunTransformLoadInner(runId As %String, baseName As %String, transformSql
                         Do $ClassMethod(util, "RunDML", "DELETE FROM " _ staging _ " WHERE " _ pkCol _ " IS NULL")
                         Set rowsStaged = rowsStaged - rowsQuarantined
                     }
-                    Do ##class(ETLWizard.Model.Event).Append(runId, "check.result", "",
+                    Do ##class(DataIntegrator.Model.Event).Append(runId, "check.result", "",
                         {"check": "quarantine_null_pk", "routed": (rowsQuarantined), "table": (quarantine)})
                 }
             }
@@ -861,7 +861,7 @@ Method RunTransformLoadInner(runId As %String, baseName As %String, transformSql
         //      re-runs are idempotent (a plain merge would hit PK violations).
         If mode = "snapshot" {
             // dated point-in-time copy, so history is kept per run (spec §7/§8)
-            Set suffix = $Translate($ZDateTime($ZTimeStamp, 8), " :", "_") _ "_" _ $Increment(^ETLWizard.SnapSeq)
+            Set suffix = $Translate($ZDateTime($ZTimeStamp, 8), " :", "_") _ "_" _ $Increment(^DataIntegrator.SnapSeq)
             Set snap = "ETLW_TARGET." _ baseName _ "_snap_" _ suffix
             Set ddlErr = $ClassMethod(util, "RunDDL", "CREATE TABLE " _ snap _ " (" _ ddlDefs _ ", etl_snapshot_at TIMESTAMP)")
             If ddlErr '= "" {
@@ -872,7 +872,7 @@ Method RunTransformLoadInner(runId As %String, baseName As %String, transformSql
                 "SELECT " _ colList _ ", CURRENT_TIMESTAMP FROM " _ staging)
             If $Extract(res, 1, 5) '= "ERROR" {
                 Do $ClassMethod(util, "CatalogNode", runId, "target", snap, "", "")
-                Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "",
+                Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "",
                     {"name": (snap), "status": "succeeded", "rowCount": (+$Piece(res, ":", 2))})
             }
         } ElseIf mode = "append" {
@@ -897,11 +897,11 @@ Method RunTransformLoadInner(runId As %String, baseName As %String, transformSql
                 Set res = res _ " || The target has a primary key but this run inserted a key that is already there. " _
                     "For a recomputed result use Merge/Upsert or Full reload; for a true append log, redeploy without a primary key."
             }
-            Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (target), "status": "failed", "error": (res)})
+            Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (target), "status": "failed", "error": (res)})
             Return res
         }
         Set rowsLoaded = +$Piece(res, ":", 2)
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", "", {"name": (target), "status": "succeeded", "rowCount": (rowsLoaded)})
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", "", {"name": (target), "status": "succeeded", "rowCount": (rowsLoaded)})
 
         // 3. Advance watermark on success (incremental transforms only)
         Set newWm = prevWm
@@ -919,7 +919,7 @@ Method RunTransformLoadInner(runId As %String, baseName As %String, transformSql
             Set maxWm = $ClassMethod(util, "ScalarQuery", "SELECT %EXTERNAL(MAX(" _ watermarkColumn _ ")) FROM " _ staging)
             If ($Extract(maxWm, 1, 5) '= "ERROR") && (maxWm '= "") {
                 If '$IsObject(wmObj) {
-                    Set wmObj = ##class(ETLWizard.Model.Watermark).%New()
+                    Set wmObj = ##class(DataIntegrator.Model.Watermark).%New()
                     Set wmObj.Pipeline = run.Pipeline
                     Set wmObj.Type = $Select($IsValidNum(maxWm): "numeric", 1: "timestamp")
                     Set wmObj.ColumnName = watermarkColumn
@@ -929,7 +929,7 @@ Method RunTransformLoadInner(runId As %String, baseName As %String, transformSql
                 Set wmObj.UpdatedAt = $ZDateTime($ZTimeStamp, 3, , 3)
                 If $$$ISOK(wmObj.%Save()) {
                     Set newWm = maxWm
-                    Do ##class(ETLWizard.Model.Event).Append(runId, "watermark.updated", "",
+                    Do ##class(DataIntegrator.Model.Event).Append(runId, "watermark.updated", "",
                         {"column": (watermarkColumn), "previous": (prevWm), "current": (maxWm)})
                 }
             }
@@ -954,7 +954,7 @@ Method RunPlan(runId As %String, baseName As %String, foreignTable As %String, m
 {
     Try {
         If mode = "bulk" {
-            Set result = ##class(ETLWizard.Tools.BulkLoad).RunBulkLoad(runId, baseName)
+            Set result = ##class(DataIntegrator.Tools.BulkLoad).RunBulkLoad(runId, baseName)
         } ElseIf transformSql '= "" {
             Set result = ..RunTransformLoad(runId, baseName, transformSql, mode, wmColumn)
         } ElseIf mode = "full" {
@@ -981,8 +981,8 @@ Method RunPlan(runId As %String, baseName As %String, foreignTable As %String, m
         // target should mirror a single source. Snapshot/append/csv-arrival
         // accumulate, and transforms reshape the data, so no match is expected.
         If (transformSql = "") && ($ListFind($ListBuild("full", "incremental"), mode) > 0) {
-            Set dq = ##class(ETLWizard.Tools.DataQuality).%New()
-            Set reconcile = dq.ReconcileCounts(runId, "ETLWIZARD." _ foreignTable, "ETLW_TARGET." _ baseName)
+            Set dq = ##class(DataIntegrator.Tools.DataQuality).%New()
+            Set reconcile = dq.ReconcileCounts(runId, "DATAINTEGRATOR." _ foreignTable, "ETLW_TARGET." _ baseName)
             Try {
                 Set stats.reconcile = ##class(%DynamicObject).%FromJSON(reconcile)
             } Catch {
@@ -1004,7 +1004,7 @@ ClassMethod GetFtColumns(foreignTable As %String, Output colList As %String, Out
         Set stmt = ##class(%SQL.Statement).%New()
         Set sc = stmt.%Prepare(
             "SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS " _
-            "WHERE TABLE_SCHEMA = 'ETLWIZARD' AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION")
+            "WHERE TABLE_SCHEMA = 'DATAINTEGRATOR' AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION")
         If $$$ISERR(sc) {
             Return "ERROR: " _ $System.Status.GetErrorText(sc)
         }
@@ -1030,7 +1030,7 @@ ClassMethod GetFtColumns(foreignTable As %String, Output colList As %String, Out
             Set ddlDefs = ddlDefs _ $Select(ddlDefs = "": "", 1: ", ") _ name _ " " _ sqlType
         }
         If colList = "" {
-            Return "ERROR: foreign table ETLWIZARD." _ foreignTable _ " not found or has no columns"
+            Return "ERROR: foreign table DATAINTEGRATOR." _ foreignTable _ " not found or has no columns"
         }
         Return ""
     } Catch ex {

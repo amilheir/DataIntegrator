@@ -4,4 +4,4 @@ ModifyUser:Name=_SYSTEM,ChangePassword=0,PasswordNeverExpires=1
 ModifyUser:Name=SuperUser,ChangePassword=0,PasswordNeverExpires=1
 ModifyUser:Name=CSPSystem,ChangePassword=0,PasswordNeverExpires=1
 [Startup]
-SystemMode=IRIS ETL Wizard Dev
+SystemMode=IRIS Data Integrator Dev

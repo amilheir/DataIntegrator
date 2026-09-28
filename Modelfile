@@ -1,5 +1,5 @@
-# Modelfile — etlwizard-qwen (spec §27.3)
-# Build with: ollama create etlwizard-qwen -f Modelfile
+# Modelfile — dataintegrator-qwen (spec §27.3)
+# Build with: ollama create dataintegrator-qwen -f Modelfile
 #
 # num_ctx must FIT IN VRAM. Oversizing silently offloads layers to CPU, which
 # roughly halves throughput (observed: 6 tok/s at 16K with 26% on CPU). 8K keeps

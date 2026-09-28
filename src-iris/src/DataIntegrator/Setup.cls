@@ -1,47 +1,47 @@
 /// One-time configuration helpers (spec §27.1). Run from a terminal in the
-/// ETLWIZARD namespace after the container is up:
+/// DATAINTEGRATOR namespace after the container is up:
 ///
-///   do ##class(ETLWizard.Setup).ConfigureLocalProfile()          // Ollama
-///   do ##class(ETLWizard.Setup).ConfigureCloudProfile("anthropic","claude-sonnet-4-5","secret://AISecrets.anthropic#apikey")
-///   do ##class(ETLWizard.Setup).SmokeTest()
-Class ETLWizard.Setup Extends %RegisteredObject
+///   do ##class(DataIntegrator.Setup).ConfigureLocalProfile()          // Ollama
+///   do ##class(DataIntegrator.Setup).ConfigureCloudProfile("anthropic","claude-sonnet-4-5","secret://AISecrets.anthropic#apikey")
+///   do ##class(DataIntegrator.Setup).SmokeTest()
+Class DataIntegrator.Setup Extends %RegisteredObject
 {
 
-/// Point AI.LLM.ETLWizard at a local Ollama endpoint (spec §27.1 Path A:
+/// Point AI.LLM.DataIntegrator at a local Ollama endpoint (spec §27.1 Path A:
 /// the nim provider speaks the OpenAI-compatible protocol Ollama serves).
-/// Build the model first:  ollama create etlwizard-coder -f Modelfile.coder
+/// Build the model first:  ollama create dataintegrator-coder -f Modelfile.coder
 /// IMPORTANT (verified on build 162): base_url MUST end with a trailing slash.
 /// The provider joins relative segments ("models", "chat/completions") onto it
 /// with URL-join semantics, so ".../v1" resolves to "/models" (404) while
 /// ".../v1/" correctly resolves to "/v1/models".
 /// The architect prompt (system + tool specs) is ~4K tokens on its own, so the
 /// model must carry a context bigger than Ollama's 4096 default or the reply
-/// comes back EMPTY (llama.cpp logs "truncated = 1"). Both etlwizard-coder and
-/// the older etlwizard-qwen set num_ctx 8192 — build one before using this.
+/// comes back EMPTY (llama.cpp logs "truncated = 1"). Both dataintegrator-coder and
+/// the older dataintegrator-qwen set num_ctx 8192 — build one before using this.
 ///
-/// This profile and AI.LLM.ETLWizardSqlGen deliberately share one model. They
-/// were split historically, but on an 8 GB card the 9B etlwizard-qwen build
+/// This profile and AI.LLM.DataIntegratorSqlGen deliberately share one model. They
+/// were split historically, but on an 8 GB card the 9B dataintegrator-qwen build
 /// (6.4 GB, 23% of layers on CPU) cannot be resident alongside the SqlGen
 /// model, so every architect <-> SqlGen alternation evicted one and paid a
-/// 5-18s reload. etlwizard-coder is 5.0 GB fully on GPU and serves both.
+/// 5-18s reload. dataintegrator-coder is 5.0 GB fully on GPU and serves both.
 /// Re-split only if a benchmark on real pipelines shows the planning quality
 /// is worth the reload cost.
 /// verbose=0 suppresses the confirmation Write — required when calling this
 /// from a REST handler, where anything written to the current device lands in
 /// the response body ahead of the JSON and breaks the client's r.json().
-ClassMethod ConfigureLocalProfile(baseUrl As %String = "http://host.docker.internal:11434/v1/", model As %String = "etlwizard-coder:latest", verbose As %Boolean = 1) As %Status
+ClassMethod ConfigureLocalProfile(baseUrl As %String = "http://host.docker.internal:11434/v1/", model As %String = "dataintegrator-coder:latest", verbose As %Boolean = 1) As %Status
 {
     Set sc = $$$OK
     Try {
         Try {
-            Do ##class(%ConfigStore.Configuration).Delete("AI.LLM.ETLWizard")
+            Do ##class(%ConfigStore.Configuration).Delete("AI.LLM.DataIntegrator")
         } Catch {
             // no previous entry — fine
         }
         Set config = {"model_provider": "nim", "model": (model), "base_url": (baseUrl)}
-        Do ##class(%ConfigStore.Configuration).Create("AI", "LLM", "", "ETLWizard", config)
+        Do ##class(%ConfigStore.Configuration).Create("AI", "LLM", "", "DataIntegrator", config)
         If verbose {
-            Write "AI.LLM.ETLWizard -> nim @ ", baseUrl, " model=", model, !
+            Write "AI.LLM.DataIntegrator -> nim @ ", baseUrl, " model=", model, !
         }
     } Catch ex {
         Set sc = ex.AsStatus()
@@ -63,27 +63,27 @@ ClassMethod ConfigureLocalProfile(baseUrl As %String = "http://host.docker.inter
 /// returns an EMPTY reply, and the OpenAI-compatible endpoint Ollama serves
 /// cannot set num_ctx per request — so the context has to be baked into a
 /// derived model. Build all three before exposing the picker:
-///   ollama create etlwizard-ornith -f Modelfile.ornith
-///   ollama create etlwizard-gemma  -f Modelfile.gemma
-///   ollama create etlwizard-coder  -f Modelfile.coder
+///   ollama create dataintegrator-ornith -f Modelfile.ornith
+///   ollama create dataintegrator-gemma  -f Modelfile.gemma
+///   ollama create dataintegrator-coder  -f Modelfile.coder
 ClassMethod AgentModels() As %DynamicArray
 {
     Return [
-        {"id": "etlwizard-ornith:latest", "label": "ornith-1.5:9b"},
-        {"id": "etlwizard-gemma:latest", "label": "gemma4:e4b"},
-        {"id": "etlwizard-coder:latest", "label": "qwen2.5-coder:7b"}
+        {"id": "dataintegrator-ornith:latest", "label": "ornith-1.5:9b"},
+        {"id": "dataintegrator-gemma:latest", "label": "gemma4:e4b"},
+        {"id": "dataintegrator-coder:latest", "label": "qwen2.5-coder:7b"}
     ]
 }
 
 /// The picker's default, used when no profile is set yet.
-Parameter DEFAULTAGENTMODEL = "etlwizard-gemma:latest";
+Parameter DEFAULTAGENTMODEL = "dataintegrator-gemma:latest";
 
 /// Model id currently serving the agents, read from the architect profile.
 /// Returns "" if the profile is missing or names something not in AgentModels().
 ClassMethod GetAgentModel() As %String
 {
     Try {
-        Set sc = ##class(%ConfigStore.Configuration).GetDetails("AI.LLM.ETLWizard", .details, 0, 1)
+        Set sc = ##class(%ConfigStore.Configuration).GetDetails("AI.LLM.DataIntegrator", .details, 0, 1)
         If $$$ISERR(sc) {
             Return ""
         }
@@ -102,8 +102,8 @@ ClassMethod GetAgentModel() As %String
 
 /// Point BOTH agent profiles at one of the AgentModels() ids.
 ///
-/// The architect (AI.LLM.ETLWizard) and the SQL/index agents
-/// (AI.LLM.ETLWizardSqlGen) deliberately move together: on an 8 GB card two
+/// The architect (AI.LLM.DataIntegrator) and the SQL/index agents
+/// (AI.LLM.DataIntegratorSqlGen) deliberately move together: on an 8 GB card two
 /// different models cannot both stay resident, so a split makes every
 /// architect <-> SqlGen alternation evict one and pay a 5-18s reload.
 ClassMethod SetAgentModel(id As %String, Output error As %String) As %Boolean
@@ -127,7 +127,7 @@ ClassMethod SetAgentModel(id As %String, Output error As %String) As %Boolean
         // Keep whatever base_url is already configured — a host-installed
         // Ollama uses host.docker.internal, the compose profile uses "ollama".
         Try {
-            Set sc = ##class(%ConfigStore.Configuration).GetDetails("AI.LLM.ETLWizard", .details, 0, 1)
+            Set sc = ##class(%ConfigStore.Configuration).GetDetails("AI.LLM.DataIntegrator", .details, 0, 1)
             If $$$ISOK(sc), details."base_url" '= "" {
                 Set baseUrl = details."base_url"
             }
@@ -152,20 +152,20 @@ ClassMethod SetAgentModel(id As %String, Output error As %String) As %Boolean
     Return 1
 }
 
-/// Point AI.LLM.ETLWizard at a cloud provider. apiKeyRef should be a secret
+/// Point AI.LLM.DataIntegrator at a cloud provider. apiKeyRef should be a secret
 /// reference (secret://Collection.item#key) — never a raw key (spec §16.4).
 ClassMethod ConfigureCloudProfile(providerName As %String, model As %String, apiKeyRef As %String) As %Status
 {
     Set sc = $$$OK
     Try {
         Try {
-            Do ##class(%ConfigStore.Configuration).Delete("AI.LLM.ETLWizard")
+            Do ##class(%ConfigStore.Configuration).Delete("AI.LLM.DataIntegrator")
         } Catch {
             // no previous entry — fine
         }
         Set config = {"model_provider": (providerName), "model": (model), "api_key": (apiKeyRef)}
-        Do ##class(%ConfigStore.Configuration).Create("AI", "LLM", "", "ETLWizard", config)
-        Write "AI.LLM.ETLWizard -> ", providerName, " model=", model, !
+        Do ##class(%ConfigStore.Configuration).Create("AI", "LLM", "", "DataIntegrator", config)
+        Write "AI.LLM.DataIntegrator -> ", providerName, " model=", model, !
     } Catch ex {
         Set sc = ex.AsStatus()
     }
@@ -173,13 +173,13 @@ ClassMethod ConfigureCloudProfile(providerName As %String, model As %String, api
 }
 
 /// Point SQL generation and the index advisor at their own, faster model.
-/// Falls back to AI.LLM.ETLWizard if unset.
+/// Falls back to AI.LLM.DataIntegrator if unset.
 ///
 /// Model choice is about output length, not tokens/sec. Benchmarked on the
 /// index-advisor prompt (431 in, ~150 tokens of JSON is the whole answer):
 ///   qwen2.5-coder:7b       148 out   12.7s  valid JSON
 ///   gemma4:e4b-it-q4_K_M  1503 out   56.3s  JSON buried in markdown prose
-///   etlwizard-qwen         3072 out  3m35s  rambled past the cap, no JSON
+///   dataintegrator-qwen         3072 out  3m35s  rambled past the cap, no JSON
 /// gemma4 is the fastest per token (32 tok/s, fully on GPU) and still the
 /// slowest wall-clock, because it writes 10x more than the task needs — which
 /// is what pushed this past the Web Gateway timeout. A small code model treats
@@ -187,18 +187,18 @@ ClassMethod ConfigureCloudProfile(providerName As %String, model As %String, api
 /// Uses the 8192-context build (Modelfile.coder) rather than stock
 /// qwen2.5-coder:7b, whose 4096 default silently truncates the larger prompts.
 /// verbose=0 suppresses the confirmation Write — see ConfigureLocalProfile.
-ClassMethod ConfigureSqlGenProfile(model As %String = "etlwizard-coder:latest", baseUrl As %String = "http://ollama:11434/v1/", verbose As %Boolean = 1) As %Status
+ClassMethod ConfigureSqlGenProfile(model As %String = "dataintegrator-coder:latest", baseUrl As %String = "http://ollama:11434/v1/", verbose As %Boolean = 1) As %Status
 {
     Set sc = $$$OK
     Try {
         Try {
-            Do ##class(%ConfigStore.Configuration).Delete("AI.LLM.ETLWizardSqlGen")
+            Do ##class(%ConfigStore.Configuration).Delete("AI.LLM.DataIntegratorSqlGen")
         } Catch {
         }
         Set config = {"model_provider": "nim", "model": (model), "base_url": (baseUrl)}
-        Do ##class(%ConfigStore.Configuration).Create("AI", "LLM", "", "ETLWizardSqlGen", config)
+        Do ##class(%ConfigStore.Configuration).Create("AI", "LLM", "", "DataIntegratorSqlGen", config)
         If verbose {
-            Write "AI.LLM.ETLWizardSqlGen -> ", model, " @ ", baseUrl, !
+            Write "AI.LLM.DataIntegratorSqlGen -> ", model, " @ ", baseUrl, !
         }
     } Catch ex {
         Set sc = ex.AsStatus()
@@ -247,7 +247,7 @@ ClassMethod CreateGatewayConnectionAny(name As %String, kind As %String = "jdbc"
 {
     Try {
         Set name = $ZStrip(name, "<>W")
-        If '##class(ETLWizard.Tools.Util).ValidIdent(name) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(name) {
             Return "ERROR: connection name must be letters, digits and underscores"
         }
         Set kind = $ZConvert($ZStrip(kind, "<>W"), "L")
@@ -303,11 +303,11 @@ ClassMethod ConfigureP1Demo() As %Status
     Return ..CreateGatewayConnection()
 }
 
-/// RBAC (spec §16.1): create the ETLWizard.Approve resource and the three
-/// roles. ETLWizard_User = run wizard + preview (no extra resource);
-/// ETLWizard_Approver = resolve approval cards; ETLWizard_Admin = both plus
+/// RBAC (spec §16.1): create the DataIntegrator.Approve resource and the three
+/// roles. DataIntegrator_User = run wizard + preview (no extra resource);
+/// DataIntegrator_Approver = resolve approval cards; DataIntegrator_Admin = both plus
 /// %Gateway_Object:USE for JDBC foreign tables.
-/// Approval enforcement is on unless dev mode: set ^ETLWizard("devMode") = 1
+/// Approval enforcement is on unless dev mode: set ^DataIntegrator("devMode") = 1
 /// to allow unauthenticated dev use (the default shipped state).
 ClassMethod CreateRoles() As %Status
 {
@@ -315,19 +315,19 @@ ClassMethod CreateRoles() As %Status
     Try {
         New $NAMESPACE
         Set $NAMESPACE = "%SYS"
-        If '##class(Security.Resources).Exists("ETLWizard.Approve") {
-            $$$ThrowOnError(##class(Security.Resources).Create("ETLWizard.Approve", "Approve ETL Wizard destructive tool calls", "", 0))
+        If '##class(Security.Resources).Exists("DataIntegrator.Approve") {
+            $$$ThrowOnError(##class(Security.Resources).Create("DataIntegrator.Approve", "Approve Data Integrator destructive tool calls", "", 0))
         }
-        If '##class(Security.Roles).Exists("ETLWizard_User") {
-            $$$ThrowOnError(##class(Security.Roles).Create("ETLWizard_User", "Run the ETL wizard, preview artifacts", ""))
+        If '##class(Security.Roles).Exists("DataIntegrator_User") {
+            $$$ThrowOnError(##class(Security.Roles).Create("DataIntegrator_User", "Run the Data Integrator, preview artifacts", ""))
         }
-        If '##class(Security.Roles).Exists("ETLWizard_Approver") {
-            $$$ThrowOnError(##class(Security.Roles).Create("ETLWizard_Approver", "Approve DDL/deploy approval cards", "ETLWizard.Approve:USE"))
+        If '##class(Security.Roles).Exists("DataIntegrator_Approver") {
+            $$$ThrowOnError(##class(Security.Roles).Create("DataIntegrator_Approver", "Approve DDL/deploy approval cards", "DataIntegrator.Approve:USE"))
         }
-        If '##class(Security.Roles).Exists("ETLWizard_Admin") {
-            $$$ThrowOnError(##class(Security.Roles).Create("ETLWizard_Admin", "ETL Wizard administration", "ETLWizard.Approve:USE,%Gateway_Object:USE"))
+        If '##class(Security.Roles).Exists("DataIntegrator_Admin") {
+            $$$ThrowOnError(##class(Security.Roles).Create("DataIntegrator_Admin", "Data Integrator administration", "DataIntegrator.Approve:USE,%Gateway_Object:USE"))
         }
-        Write "Roles ETLWizard_User / ETLWizard_Approver / ETLWizard_Admin ready", !
+        Write "Roles DataIntegrator_User / DataIntegrator_Approver / DataIntegrator_Admin ready", !
     } Catch ex {
         Set sc = ex.AsStatus()
     }
@@ -337,11 +337,11 @@ ClassMethod CreateRoles() As %Status
 /* ===================================================================
    Presentation and governance configuration (IMPROVEMENTS_SPEC §1.1, §3)
 
-   All of it lives in ^ETLWizard(...) so an instance can be pointed at a
+   All of it lives in ^DataIntegrator(...) so an instance can be pointed at a
    different audience without a redeployment, and so scripts/demo-verify.sh
    can assert the shipped state from outside.
    =================================================================== */
-/// Fallback when ^ETLWizard("defaultView") has never been set: the product
+/// Fallback when ^DataIntegrator("defaultView") has never been set: the product
 /// behaves exactly as it always has.
 Parameter DEFAULTVIEW = "technical";
 
@@ -350,7 +350,7 @@ Parameter DEFAULTVIEW = "technical";
 /// first, engineering detail withdrawn). Served on GET /wizard/options.
 ClassMethod GetDefaultView() As %String
 {
-    Set view = $ZConvert($Get(^ETLWizard("defaultView"), ..#DEFAULTVIEW), "L")
+    Set view = $ZConvert($Get(^DataIntegrator("defaultView"), ..#DEFAULTVIEW), "L")
     If (view '= "technical") && (view '= "executive") {
         Set view = ..#DEFAULTVIEW
     }
@@ -358,20 +358,20 @@ ClassMethod GetDefaultView() As %String
 }
 
 /// Set the instance-wide default view. Returns "" or an error message.
-///   do ##class(ETLWizard.Setup).SetDefaultView("executive")
+///   do ##class(DataIntegrator.Setup).SetDefaultView("executive")
 ClassMethod SetDefaultView(view As %String) As %String
 {
     Set view = $ZConvert($ZStrip(view, "<>W"), "L")
     If (view '= "technical") && (view '= "executive") {
         Return "ERROR: view must be technical or executive"
     }
-    Set ^ETLWizard("defaultView") = view
+    Set ^DataIntegrator("defaultView") = view
     Return ""
 }
 
 /// The business scenario the Executive view narrates: the question being
 /// answered, the sources in business language, and the tab labels. Held as
-/// JSON in ^ETLWizard("scenario") so the story is configurable without editing
+/// JSON in ^DataIntegrator("scenario") so the story is configurable without editing
 /// markup. Defaults describe the shipped sample data (DA-1).
 ClassMethod Scenario() As %DynamicObject
 {
@@ -400,7 +400,7 @@ ClassMethod Scenario() As %DynamicObject
         "execTheme": "light",
         "eapNote": "InterSystems IRIS Data Platform"
     }
-    Set raw = $Get(^ETLWizard("scenario"), "")
+    Set raw = $Get(^DataIntegrator("scenario"), "")
     If raw = "" {
         Return default
     }
@@ -426,15 +426,15 @@ ClassMethod SetScenario(json As %String) As %String
     } Catch ex {
         Return "ERROR: not valid JSON - " _ ex.DisplayString()
     }
-    Set ^ETLWizard("scenario") = json
+    Set ^DataIntegrator("scenario") = json
     Return ""
 }
 
 /// Turn approval enforcement ON (IMPROVEMENTS_SPEC SG-1).
 ///
-/// The blocking approval policy in ETLWizard.Policy.Auth is fully implemented,
-/// but ^ETLWizard("devMode") defaults to 1 and the dispatcher skips the
-/// ETLWizard.Approve:USE check while it is set - so in the shipped
+/// The blocking approval policy in DataIntegrator.Policy.Auth is fully implemented,
+/// but ^DataIntegrator("devMode") defaults to 1 and the dispatcher skips the
+/// DataIntegrator.Approve:USE check while it is set - so in the shipped
 /// configuration nothing requires a human to approve anything, and the
 /// governance claim is not true of the default instance.
 ///
@@ -451,10 +451,10 @@ ClassMethod EnableApprovals(timeoutSecs As %Integer = 900) As %Status
         If $$$ISERR(sc) {
             Return sc
         }
-        Set ^ETLWizard("devMode") = 0
-        Set ^ETLWizard("approvalTimeoutSecs") = timeoutSecs
+        Set ^DataIntegrator("devMode") = 0
+        Set ^DataIntegrator("approvalTimeoutSecs") = timeoutSecs
         Write "Approvals ENFORCED - devMode=0, approvalTimeoutSecs=", timeoutSecs, !
-        Write "Resolving an approval now requires ETLWizard.Approve:USE (role ETLWizard_Approver).", !
+        Write "Resolving an approval now requires DataIntegrator.Approve:USE (role DataIntegrator_Approver).", !
     } Catch ex {
         Set sc = ex.AsStatus()
     }
@@ -465,7 +465,7 @@ ClassMethod EnableApprovals(timeoutSecs As %Integer = 900) As %Status
 /// a demo that makes a governance claim.
 ClassMethod DisableApprovals() As %Status
 {
-    Set ^ETLWizard("devMode") = 1
+    Set ^DataIntegrator("devMode") = 1
     Write "Approvals NOT enforced - devMode=1 (development default)", !
     Return $$$OK
 }
@@ -479,18 +479,18 @@ ClassMethod CreateDemoUsers(password As %String = "") As %Status
     Set sc = $$$OK
     Try {
         If password = "" {
-            Return $$$ERROR($$$GeneralError, "pass a password: do ##class(ETLWizard.Setup).CreateDemoUsers(""...."")")
+            Return $$$ERROR($$$GeneralError, "pass a password: do ##class(DataIntegrator.Setup).CreateDemoUsers(""...."")")
         }
         New $NAMESPACE
         Set $NAMESPACE = "%SYS"
         For i = 1:1:2 {
             Set name = $Case(i, 1: "demo_analyst", 2: "demo_engineer")
-            Set role = $Case(i, 1: "ETLWizard_User", 2: "ETLWizard_Approver")
-            Set full = $Case(i, 1: "ETL Wizard demo analyst", 2: "ETL Wizard demo engineer")
+            Set role = $Case(i, 1: "DataIntegrator_User", 2: "DataIntegrator_Approver")
+            Set full = $Case(i, 1: "Data Integrator demo analyst", 2: "Data Integrator demo engineer")
             If ##class(Security.Users).Exists(name) {
                 $$$ThrowOnError(##class(Security.Users).Delete(name))
             }
-            // Only the ETLWizard role is granted here: whatever role the web
+            // Only the DataIntegrator role is granted here: whatever role the web
             // application itself is secured with has to be added on top, and
             // that differs between a Web Gateway front end and a private web
             // server. Add it with Security.Users.AddRoles() if login fails.
@@ -528,7 +528,7 @@ ClassMethod PrepareServers(dropzone As %String = "/opt/irisbuild/dropzone") As %
             Return sc
         }
         Set runId = ..DemoRunId()
-        Set ft = ##class(ETLWizard.Tools.ForeignTable).%New()
+        Set ft = ##class(DataIntegrator.Tools.ForeignTable).%New()
         Write ft.CreateForeignServer(runId, "SRC_POSTGRES", "JDBC", "pg_crm_connection"), !
         Write ft.CreateForeignServer(runId, "SRC_DROPZONE", "CSV", dropzone), !
         Write "Foreign servers ready. Now run MountDemoTables() in a NEW session.", !
@@ -546,7 +546,7 @@ ClassMethod MountDemoTables() As %Status
     Set sc = $$$OK
     Try {
         Set runId = ..DemoRunId()
-        Set ft = ##class(ETLWizard.Tools.ForeignTable).%New()
+        Set ft = ##class(DataIntegrator.Tools.ForeignTable).%New()
 
         // The demo's three source tables. Auto-import only: supplying an
         // explicit column list to CREATE FOREIGN TABLE over JDBC silently
@@ -581,17 +581,17 @@ ClassMethod MountDemoTables() As %Status
 ClassMethod DemoRunId() As %String [ Internal ]
 {
     Set name = "__data_sources__"
-    Set pipelineId = ##class(ETLWizard.Tools.Util).ScalarQuery(
-        "SELECT TOP 1 ID FROM ETLWizard_Model.Pipeline WHERE Name = ? ORDER BY ID", name)
+    Set pipelineId = ##class(DataIntegrator.Tools.Util).ScalarQuery(
+        "SELECT TOP 1 ID FROM DataIntegrator_Model.Pipeline WHERE Name = ? ORDER BY ID", name)
     If pipelineId = "" {
-        Set pipeline = ##class(ETLWizard.Model.Pipeline).%New()
+        Set pipeline = ##class(DataIntegrator.Model.Pipeline).%New()
         Set pipeline.Name = name
         Set pipeline.Description = "Internal: owns tables mounted from the Data Sources tab"
         $$$ThrowOnError(pipeline.%Save())
     } Else {
-        Set pipeline = ##class(ETLWizard.Model.Pipeline).%OpenId(pipelineId)
+        Set pipeline = ##class(DataIntegrator.Model.Pipeline).%OpenId(pipelineId)
     }
-    Set run = ##class(ETLWizard.Model.Run).%New()
+    Set run = ##class(DataIntegrator.Model.Run).%New()
     Set run.Pipeline = pipeline
     // Trigger is a VALUELIST (wizard/schedule/manual); "sources" is not a member
     Set run.Trigger = "wizard"
@@ -600,7 +600,7 @@ ClassMethod DemoRunId() As %String [ Internal ]
 }
 
 /// Mount one JDBC foreign table and report the outcome.
-ClassMethod MountJdbc(ft As ETLWizard.Tools.ForeignTable, runId As %String, localName As %String, serverName As %String, remoteTable As %String) [ Internal ]
+ClassMethod MountJdbc(ft As DataIntegrator.Tools.ForeignTable, runId As %String, localName As %String, serverName As %String, remoteTable As %String) [ Internal ]
 {
     Set res = ft.CreateForeignTableJdbc(runId, localName, serverName, remoteTable)
     If res [ "SQLCODE -237" {
@@ -614,8 +614,8 @@ ClassMethod MountJdbc(ft As ETLWizard.Tools.ForeignTable, runId As %String, loca
 ClassMethod PrintDemoConfig()
 {
     Set json = {}
-    Set json.devMode = +$Get(^ETLWizard("devMode"), 1)
-    Set json.approvalTimeoutSecs = +$Get(^ETLWizard("approvalTimeoutSecs"), ##class(ETLWizard.Policy.Auth).#DEFAULTTIMEOUT)
+    Set json.devMode = +$Get(^DataIntegrator("devMode"), 1)
+    Set json.approvalTimeoutSecs = +$Get(^DataIntegrator("approvalTimeoutSecs"), ##class(DataIntegrator.Policy.Auth).#DEFAULTTIMEOUT)
     Set json.defaultView = ..GetDefaultView()
     Set json.agentModel = ..GetAgentModel()
     // Governance facts the verify script asserts (IMPROVEMENTS_SPEC SG-1/SG-4).
@@ -627,14 +627,14 @@ ClassMethod PrintDemoConfig()
     Try {
         New $NAMESPACE
         Set $NAMESPACE = "%SYS"
-        If $$$ISOK(##class(Security.Applications).Get("/etlwizard/api", .app)) {
+        If $$$ISOK(##class(Security.Applications).Get("/dataintegrator/api", .app)) {
             Set json.appMatchRoles = $Get(app("MatchRoles"))
         }
         // LIKE, not %STARTSWITH: Security.Users.Roles is a length-prefixed
         // list, so the role name is never at offset 1 even for a single role.
         Set rs = ##class(%SQL.Statement).%ExecDirect(,
             "SELECT COUNT(*) FROM Security.Users WHERE Roles LIKE ? OR Roles LIKE ?",
-            "%ETLWizard_Approver%", "%ETLWizard_Admin%")
+            "%DataIntegrator_Approver%", "%DataIntegrator_Admin%")
         If rs.%Next() {
             Set json.approverAccounts = +rs.%GetData(1)
         }
@@ -650,20 +650,20 @@ ClassMethod SmokeTest() As %Status
 {
     Set sc = $$$OK
     Try {
-        Set pipeline = ##class(ETLWizard.Model.Pipeline).%New()
+        Set pipeline = ##class(DataIntegrator.Model.Pipeline).%New()
         Set pipeline.Name = "smoketest-" _ $Translate($ZDateTime($ZTimeStamp, 3), " :", "-")
         $$$ThrowOnError(pipeline.%Save())
 
-        Set run = ##class(ETLWizard.Model.Run).%New()
+        Set run = ##class(DataIntegrator.Model.Run).%New()
         Set run.Pipeline = pipeline
         Set run.Trigger = "manual"
         $$$ThrowOnError(run.%Save())
         Set runId = run.%Id()
 
-        $$$ThrowOnError(##class(ETLWizard.Model.Event).Append(runId, "run.started", "", {"smoke": true}))
+        $$$ThrowOnError(##class(DataIntegrator.Model.Event).Append(runId, "run.started", "", {"smoke": true}))
 
         Write "Run ", runId, " created. Invoking agent...", !
-        Set sc = ##class(ETLWizard.Agent.Service).ChatTurn(runId,
+        Set sc = ##class(DataIntegrator.Agent.Service).ChatTurn(runId,
             "Record a catalog node of kind 'source' named 'smoke_source', then emit a note saying hello.")
         If $$$ISERR(sc) {
             Write "Agent turn failed: ", $System.Status.GetErrorText(sc), !
@@ -671,7 +671,7 @@ ClassMethod SmokeTest() As %Status
 
         Write !, "Event log:", !
         Set stmt = ##class(%SQL.Statement).%New()
-        $$$ThrowOnError(stmt.%Prepare("SELECT Seq, Type, PayloadJson FROM ETLWizard_Model.Event WHERE Run = ? ORDER BY Seq"))
+        $$$ThrowOnError(stmt.%Prepare("SELECT Seq, Type, PayloadJson FROM DataIntegrator_Model.Event WHERE Run = ? ORDER BY Seq"))
         Set rs = stmt.%Execute(runId)
         While rs.%Next() {
             Write rs.Seq, "  ", rs.Type, "  ", $Extract(rs.PayloadJson, 1, 120), !

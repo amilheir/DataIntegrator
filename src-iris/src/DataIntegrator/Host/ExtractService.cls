@@ -4,7 +4,7 @@
 /// of a standalone %SYS.Task.
 /// Reusable across pipelines: the generated Ens.Production sets PipelineId
 /// per item, so the production class remains the visible generated artifact.
-Class ETLWizard.Host.ExtractService Extends Ens.BusinessService
+Class DataIntegrator.Host.ExtractService Extends Ens.BusinessService
 {
 
 Parameter ADAPTER = "Ens.InboundAdapter";
@@ -24,16 +24,16 @@ Method OnProcessInput(pInput As %RegisteredObject, Output pOutput As %Registered
         If ..PipelineId = "" {
             Return $$$ERROR($$$GeneralError, "PipelineId setting is empty")
         }
-        Set pipeline = ##class(ETLWizard.Model.Pipeline).%OpenId(..PipelineId)
+        Set pipeline = ##class(DataIntegrator.Model.Pipeline).%OpenId(..PipelineId)
         If '$IsObject(pipeline) {
             Return $$$ERROR($$$GeneralError, "Pipeline not found: " _ ..PipelineId)
         }
-        Set err = ##class(ETLWizard.Runtime.Executor).ParsePlan(pipeline, .baseName, .foreignTable, .wmColumn, .mode, .csvServer, .columnDefs, .transformSql)
+        Set err = ##class(DataIntegrator.Runtime.Executor).ParsePlan(pipeline, .baseName, .foreignTable, .wmColumn, .mode, .csvServer, .columnDefs, .transformSql)
         If err '= "" {
             Return $$$ERROR($$$GeneralError, err)
         }
 
-        Set run = ##class(ETLWizard.Model.Run).%New()
+        Set run = ##class(DataIntegrator.Model.Run).%New()
         Set run.Pipeline = pipeline
         Set run.Trigger = "schedule"
         Set sc = run.%Save()
@@ -41,10 +41,10 @@ Method OnProcessInput(pInput As %RegisteredObject, Output pOutput As %Registered
             Return sc
         }
         Set runId = run.%Id()
-        Do ##class(ETLWizard.Model.Event).Append(runId, "run.started", "",
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "run.started", "",
             {"pipelineId": (..PipelineId), "pipelineName": (pipeline.Name), "trigger": "production", "llm": false})
 
-        Set req = ##class(ETLWizard.Msg.ExtractBatch).%New()
+        Set req = ##class(DataIntegrator.Msg.ExtractBatch).%New()
         Set req.PipelineId = ..PipelineId
         Set req.RunId = runId
         Set req.BaseName = baseName
@@ -61,7 +61,7 @@ Method OnProcessInput(pInput As %RegisteredObject, Output pOutput As %Registered
         If $$$ISERR(sc) || ('$IsObject(resp)) || ('resp.Ok) {
             Set errText = $Select($$$ISERR(sc): $System.Status.GetErrorText(sc),
                                   $IsObject(resp): resp.Error, 1: "no response from " _ ..TargetProcess)
-            Do ##class(ETLWizard.Model.Event).Append(runId, "run.error", "", {"error": (errText)})
+            Do ##class(DataIntegrator.Model.Event).Append(runId, "run.error", "", {"error": (errText)})
             Set run.Status = "failed"
             Set pipeline.Status = "Failed"
         } Else {
@@ -77,7 +77,7 @@ Method OnProcessInput(pInput As %RegisteredObject, Output pOutput As %Registered
             Set stats = ##class(%DynamicObject).%FromJSON(run.StatsJson)
         } Catch {
         }
-        Do ##class(ETLWizard.Model.Event).Append(runId, "run.finished", "",
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "run.finished", "",
             {"status": (run.Status), "stats": (stats)})
     } Catch ex {
         Set sc = ex.AsStatus()

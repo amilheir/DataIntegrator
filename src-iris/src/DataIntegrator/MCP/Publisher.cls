@@ -4,18 +4,18 @@ Include %occStatus
 /// (mds/mcp-tab-plan.md).
 ///
 /// One fixed endpoint, one regenerated ToolSet. Publishing rewrites the XData
-/// of ETLWizard.MCP.ToolSet and recompiles it; config.toml never changes, so
+/// of DataIntegrator.MCP.ToolSet and recompiles it; config.toml never changes, so
 /// no MCP-server restart is needed to add a table.
 ///
 /// Tools are <Query> elements - SQL, no ObjectScript. The %AI.ToolSet compiler
 /// builds the JSON Schema from Arguments, binds the :name placeholders and
 /// enforces MaxRows for us.
-Class ETLWizard.MCP.Publisher Extends %RegisteredObject
+Class DataIntegrator.MCP.Publisher Extends %RegisteredObject
 {
 
-Parameter TOOLSETCLASS = "ETLWizard.MCP.ToolSet";
+Parameter TOOLSETCLASS = "DataIntegrator.MCP.ToolSet";
 
-Parameter SERVICECLASS = "ETLWizard.MCP.Service";
+Parameter SERVICECLASS = "DataIntegrator.MCP.Service";
 
 Parameter ENDPOINT = "/mcp/irisaihub";
 
@@ -26,11 +26,11 @@ Parameter MAXROWS = 1000;
 /// Default row cap for a generated "all rows" tool.
 Parameter DEFAULTMAXROWS = 200;
 
-/// Schemas a published query may read. ETLW_* are ours; ETLWIZARD holds the
+/// Schemas a published query may read. ETLW_* are ours; DATAINTEGRATOR holds the
 /// mounted foreign tables; INFORMATION_SCHEMA is what the _schema tools read.
 ClassMethod AllowedSchemas() As %List [ Internal ]
 {
-    Return $ListBuild("ETLW_TARGET", "ETLW_STAGING", "ETLW_LANDING", "ETLWIZARD", "INFORMATION_SCHEMA")
+    Return $ListBuild("ETLW_TARGET", "ETLW_STAGING", "ETLW_LANDING", "DATAINTEGRATOR", "INFORMATION_SCHEMA")
 }
 
 /// Where the published spec is kept so the tab can re-edit it. The compiled
@@ -38,7 +38,7 @@ ClassMethod AllowedSchemas() As %List [ Internal ]
 /// Publish writes both or neither.
 ClassMethod SpecNode() As %String [ Internal ]
 {
-    Return "^ETLWizard.MCP"
+    Return "^DataIntegrator.MCP"
 }
 
 // ---------------------------------------------------------------- discovery
@@ -55,7 +55,7 @@ ClassMethod ListPublishable() As %DynamicArray
         While rs.%Next() {
             Set name = rs.%GetData(1)
             Set full = "ETLW_TARGET." _ name
-            Set rows = ##class(ETLWizard.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ full)
+            Set rows = ##class(DataIntegrator.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ full)
             If $Extract(rows, 1, 5) = "ERROR" {
                 Set rows = ""
             }
@@ -100,7 +100,7 @@ ClassMethod ProposeTools(table As %String) As %DynamicObject
 {
     Try {
         Set bare = $Piece(table, ".", *)
-        If '##class(ETLWizard.Tools.Util).ValidIdent(bare) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(bare) {
             Return {"error": ("not a valid table name: " _ table)}
         }
         Set full = "ETLW_TARGET." _ bare
@@ -111,7 +111,7 @@ ClassMethod ProposeTools(table As %String) As %DynamicObject
 
         Set prefix = ..ToolPrefix(bare)
         Set tools = []
-        Set rowCount = ##class(ETLWizard.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ full)
+        Set rowCount = ##class(DataIntegrator.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ full)
         If $Extract(rowCount, 1, 5) = "ERROR" {
             Set rowCount = "?"
         }
@@ -231,7 +231,7 @@ ClassMethod PickMeasure(cols As %DynamicArray) As %String [ Internal ]
 /// whether a column is worth grouping by.
 ClassMethod DistinctCount(full As %String, col As %String) As %Integer [ Internal ]
 {
-    Set res = ##class(ETLWizard.Tools.Util).ScalarQuery("SELECT COUNT(DISTINCT " _ col _ ") FROM " _ full)
+    Set res = ##class(DataIntegrator.Tools.Util).ScalarQuery("SELECT COUNT(DISTINCT " _ col _ ") FROM " _ full)
     If ($Extract(res, 1, 5) = "ERROR") || (res = "") {
         Return -1
     }
@@ -289,7 +289,7 @@ ClassMethod ValidateTool(tool As %DynamicObject) As %String [ Internal ]
     If name = "" {
         Return "every tool needs a name"
     }
-    If '##class(ETLWizard.Tools.Util).ValidIdent(name) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(name) {
         Return "tool name '" _ name _ "' must start with a letter and contain only letters, digits and underscores"
     }
     If $Length(name) > 64 {
@@ -303,7 +303,7 @@ ClassMethod ValidateTool(tool As %DynamicObject) As %String [ Internal ]
     If sql = "" {
         Return "tool '" _ name _ "' has no SQL"
     }
-    If '##class(ETLWizard.Tools.Util).IsSelectOnly(sql) {
+    If '##class(DataIntegrator.Tools.Util).IsSelectOnly(sql) {
         Return "tool '" _ name _ "' must be a single SELECT statement"
     }
     If sql [ "]]>" {
@@ -330,7 +330,7 @@ ClassMethod ValidateTool(tool As %DynamicObject) As %String [ Internal ]
 /// treating it as one rejected every legitimate join.
 ClassMethod CheckTables(sql As %String) As %String [ Internal ]
 {
-    Set clean = ##class(ETLWizard.Tools.Util).StripSqlComments(sql)
+    Set clean = ##class(DataIntegrator.Tools.Util).StripSqlComments(sql)
     Set clean = ..BlankLiterals(clean)
     Set allowed = ..AllowedSchemas()
     Set upper = $ZConvert(clean, "U")
@@ -439,7 +439,7 @@ ClassMethod CheckArguments(name As %String, spec As %String, sql As %String) As 
             Return "tool '" _ name _ "' has an empty argument declaration"
         }
         Set argName = $ZStrip($Piece(part, " ", 1), "<>W")
-        If '##class(ETLWizard.Tools.Util).ValidIdent(argName) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(argName) {
             Return "tool '" _ name _ "': '" _ argName _ "' is not a valid argument name"
         }
         Set kw = $ZConvert($ZStrip($Piece(part, " ", 2), "<>W"), "U")
@@ -593,7 +593,7 @@ ClassMethod WriteToolSetClass(cls As %String, xml As %String) As %String [ Inter
 {
     Set nl = $Char(10)
     Set src = "/// MCP tools over the tables Data Integration built." _ nl
-    Set src = src _ "/// GENERATED by ETLWizard.MCP.Publisher - edit the tools in the MCP Tools tab," _ nl
+    Set src = src _ "/// GENERATED by DataIntegrator.MCP.Publisher - edit the tools in the MCP Tools tab," _ nl
     Set src = src _ "/// not here. Every publish overwrites this class." _ nl
     Set src = src _ "Class " _ cls _ " Extends %AI.ToolSet" _ nl _ "{" _ nl _ nl
     Set src = src _ "XData Definition [ MimeType = application/xml ]" _ nl _ "{" _ nl
@@ -732,7 +732,7 @@ ClassMethod EnsureService() As %String
         If '##class(%Dictionary.CompiledClass).%ExistsId(..#SERVICECLASS) {
             Set nl = $Char(10)
             Set src = "/// MCP service for InterSystems IRIS Data Integration, served at " _ ..#ENDPOINT _ "." _ nl
-            Set src = src _ "/// GENERATED by ETLWizard.MCP.Publisher. The tools it exposes live in" _ nl
+            Set src = src _ "/// GENERATED by DataIntegrator.MCP.Publisher. The tools it exposes live in" _ nl
             Set src = src _ "/// " _ ..#TOOLSETCLASS _ ", which is rewritten on every publish." _ nl
             Set src = src _ "Class " _ ..#SERVICECLASS _ " Extends %AI.MCP.Service" _ nl _ "{" _ nl _ nl
             Set src = src _ "Parameter SPECIFICATION As STRING = """ _ ..#TOOLSETCLASS _ """;" _ nl _ nl _ "}" _ nl

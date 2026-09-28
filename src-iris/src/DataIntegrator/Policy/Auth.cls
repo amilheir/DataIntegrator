@@ -11,10 +11,10 @@ Include %AI
 /// returns $$$OK to allow or $$$ERROR($$$AICoreToolAccessDenied, reason).
 /// Stateless by design (no instance properties) so the ToolSet stays
 /// non-stateful.
-Class ETLWizard.Policy.Auth Extends %AI.Policy.Authorization
+Class DataIntegrator.Policy.Auth Extends %AI.Policy.Authorization
 {
 
-/// Approval wait timeout in seconds (override via ^ETLWizard("approvalTimeoutSecs"))
+/// Approval wait timeout in seconds (override via ^DataIntegrator("approvalTimeoutSecs"))
 Parameter DEFAULTTIMEOUT = 300;
 
 Method %CanExecute(tool As %String, call As %DynamicObject, metadata As %DynamicObject) As %Status
@@ -45,14 +45,14 @@ Method %CanExecute(tool As %String, call As %DynamicObject, metadata As %Dynamic
         }
 
         // Block until a human resolves the approval (spec §10.3)
-        Set timeout = +$Get(^ETLWizard("approvalTimeoutSecs"), ..#DEFAULTTIMEOUT)
+        Set timeout = +$Get(^DataIntegrator("approvalTimeoutSecs"), ..#DEFAULTTIMEOUT)
         Set deadline = $ZHorolog + timeout
         While $ZHorolog < deadline {
             Set status = ""
             Set comment = ""
             Set resolvedBy = ""
             &sql(SELECT Status, "Comment", ResolvedBy INTO :status, :comment, :resolvedBy
-                 FROM ETLWizard_Model.PendingApproval WHERE ID = :approvalId)
+                 FROM DataIntegrator_Model.PendingApproval WHERE ID = :approvalId)
             If SQLCODE '= 0 {
                 Set reason = "Approval record lost (SQLCODE " _ SQLCODE _ ")"
                 Return $$$ERROR($$$AICoreToolAccessDenied, reason)
@@ -112,16 +112,16 @@ ClassMethod RequiresAuth(tool As %String, call As %DynamicObject, metadata As %D
 /// and it does not work here: both web applications are installed with
 /// MatchRoles=":%All" (Installer.cls), so every request - including an
 /// unauthenticated one - already holds every privilege, and
-/// Check("ETLWizard.Approve","USE") returns true for anybody. Verified on this
-/// instance: demo_analyst, holding only ETLWizard_User, successfully approved a
-/// pending card while ^ETLWizard("devMode") was 0.
+/// Check("DataIntegrator.Approve","USE") returns true for anybody. Verified on this
+/// instance: demo_analyst, holding only DataIntegrator_User, successfully approved a
+/// pending card while ^DataIntegrator("devMode") was 0.
 ///
 /// Asking "is this named human actually an approver?" is the question the
 /// governance claim makes, and it is not defeated by the application's role
 /// escalation.
 ///
 /// Note: only DIRECTLY assigned roles are read. A role that merely includes
-/// ETLWizard_Approver is not detected - assign the role itself.
+/// DataIntegrator_Approver is not detected - assign the role itself.
 ClassMethod CanApprove(Output why As %String) As %Boolean
 {
     Set why = ""
@@ -139,10 +139,10 @@ ClassMethod CanApprove(Output why As %String) As %Boolean
         }
         $$$ThrowOnError(##class(Security.Users).Get(user, .props))
         Set roles = "," _ $Get(props("Roles")) _ ","
-        If (roles [ ",ETLWizard_Approver,") || (roles [ ",ETLWizard_Admin,") || (roles [ ",%All,") {
+        If (roles [ ",DataIntegrator_Approver,") || (roles [ ",DataIntegrator_Admin,") || (roles [ ",%All,") {
             Return 1
         }
-        Set why = "user " _ user _ " does not hold ETLWizard_Approver"
+        Set why = "user " _ user _ " does not hold DataIntegrator_Approver"
     } Catch ex {
         Set why = "could not read the roles of " _ user _ ": " _ ex.DisplayString()
         Return 0
@@ -156,11 +156,11 @@ ClassMethod RequestApproval(runId As %String, toolName As %String, argsJson As %
     Set sc = $$$OK
     Set approvalId = ""
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return $$$ERROR($$$GeneralError, "Run not found: " _ runId)
         }
-        Set approval = ##class(ETLWizard.Model.PendingApproval).%New()
+        Set approval = ##class(DataIntegrator.Model.PendingApproval).%New()
         Set approval.Run = run
         Set approval.Tool = toolName
         Set approval.ArgsJson = argsJson
@@ -174,7 +174,7 @@ ClassMethod RequestApproval(runId As %String, toolName As %String, argsJson As %
             Set args = ##class(%DynamicObject).%FromJSON(argsJson)
         } Catch {
         }
-        Set sc = ##class(ETLWizard.Model.Event).Append(runId, "approval.requested", "",
+        Set sc = ##class(DataIntegrator.Model.Event).Append(runId, "approval.requested", "",
             {"approvalId": (approvalId), "tool": (toolName), "args": (args)})
     } Catch ex {
         Set sc = ex.AsStatus()
@@ -185,12 +185,12 @@ ClassMethod RequestApproval(runId As %String, toolName As %String, argsJson As %
 ClassMethod ExpireApproval(approvalId As %String, runId As %String) [ Internal ]
 {
     Try {
-        Set approval = ##class(ETLWizard.Model.PendingApproval).%OpenId(approvalId)
+        Set approval = ##class(DataIntegrator.Model.PendingApproval).%OpenId(approvalId)
         If $IsObject(approval), approval.Status = "pending" {
             Set approval.Status = "expired"
             Set approval.ResolvedAt = $ZDateTime($ZTimeStamp, 3, , 3)
             Do approval.%Save()
-            Do ##class(ETLWizard.Model.Event).Append(runId, "approval.resolved", "",
+            Do ##class(DataIntegrator.Model.Event).Append(runId, "approval.resolved", "",
                 {"approvalId": (approvalId), "status": "expired"})
         }
     } Catch {

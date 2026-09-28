@@ -2,7 +2,7 @@
 /// straight into a target table with IRIS LOAD DATA / LOAD BULK DATA, bypassing
 /// the foreign-table + transform path. Files live in the dropzone on the IRIS
 /// server filesystem (LOAD [BULK] DATA reads server-side files by path).
-Class ETLWizard.Tools.BulkLoad Extends %RegisteredObject
+Class DataIntegrator.Tools.BulkLoad Extends %RegisteredObject
 {
 
 /// Rows scanned to decide day-first vs month-first ordering (see DayFirst()).
@@ -77,7 +77,7 @@ ClassMethod XlsxToCsv(fileName As %String) As %String
 /// InferCsvTypes JSON: {columnDefs, columns, sampledRows}.
 ClassMethod InferColumns(fileName As %String) As %String
 {
-    Set csv = ##class(ETLWizard.Tools.CsvProfiling).%New()
+    Set csv = ##class(DataIntegrator.Tools.CsvProfiling).%New()
     Return csv.InferCsvTypes(fileName)
 }
 
@@ -97,7 +97,7 @@ ClassMethod BuildLoadSql(target As %String, colList As %String, path As %String,
         " (" _ colList _ ") USING " _ using.%ToJSON()
 }
 
-/// Where an ingested file lands: ETLWIZARD.ext_<name>, the same shape the
+/// Where an ingested file lands: DATAINTEGRATOR.ext_<name>, the same shape the
 /// mounted sources use, so everything the Data Sources tab produces is findable
 /// in one place. A name that already carries the prefix is not double-prefixed.
 ClassMethod SourceTableName(baseName As %String) As %String
@@ -106,7 +106,7 @@ ClassMethod SourceTableName(baseName As %String) As %String
     If $ZConvert($Extract(bare, 1, 4), "L") = "ext_" {
         Set bare = $Extract(bare, 5, *)
     }
-    Return "ETLWIZARD.ext_" _ bare
+    Return "DATAINTEGRATOR.ext_" _ bare
 }
 
 /// Repair the two file shapes that this loader cannot read, writing a cleaned
@@ -154,19 +154,19 @@ ClassMethod NormalizeCsv(fileName As %String, separator As %String = ",", Output
 
         // Shape 1: the whole line is one quoted field that still contains the
         // separator.
-        Set nFields = ##class(ETLWizard.Tools.CsvProfiling).SplitAll(header, sep, .headFld)
+        Set nFields = ##class(DataIntegrator.Tools.CsvProfiling).SplitAll(header, sep, .headFld)
         Set wrapped = 0
         If (nFields = 1) && ($Get(headFld(1)) [ sep) {
             Set wrapped = 1
             Set header = headFld(1)
-            Set nFields = ##class(ETLWizard.Tools.CsvProfiling).SplitAll(header, sep, .headFld)
+            Set nFields = ##class(DataIntegrator.Tools.CsvProfiling).SplitAll(header, sep, .headFld)
         }
 
         // Shape 2: any header cell that is not already a usable identifier.
         Set renamed = 0, names = "", seen = ","
         For c = 1:1:nFields {
             Set original = $ZStrip($Get(headFld(c)), "<>W")
-            Set safe = ##class(ETLWizard.Tools.CsvProfiling).SafeColumnName(original, c)
+            Set safe = ##class(DataIntegrator.Tools.CsvProfiling).SafeColumnName(original, c)
             // duplicate names after sanitising would be ambiguous in the target
             If seen [ ("," _ $ZConvert(safe, "U") _ ",") {
                 Set safe = safe _ "_" _ c
@@ -201,7 +201,7 @@ ClassMethod NormalizeCsv(fileName As %String, separator As %String = ",", Output
                 Continue
             }
             If wrapped {
-                Set n = ##class(ETLWizard.Tools.CsvProfiling).SplitAll(line, sep, .f)
+                Set n = ##class(DataIntegrator.Tools.CsvProfiling).SplitAll(line, sep, .f)
                 // A wrapped row unwraps to exactly one field; anything else is a
                 // row that was not wrapped, and is passed through untouched
                 // rather than silently mangled.
@@ -215,7 +215,7 @@ ClassMethod NormalizeCsv(fileName As %String, separator As %String = ",", Output
             // and the loader accepted the file and inserted nothing, with no
             // error to explain why. Rebuilding guarantees the output is
             // well-formed whatever the input looked like.
-            Set nf = ##class(ETLWizard.Tools.CsvProfiling).SplitAll(line, sep, .chk)
+            Set nf = ##class(DataIntegrator.Tools.CsvProfiling).SplitAll(line, sep, .chk)
             Set allEmpty = 1
             For k = 1:1:nf {
                 If $ZStrip($Get(chk(k)), "<>W") '= "" {
@@ -311,7 +311,7 @@ ClassMethod DayFirst(path As %String, sep As %String) As %Boolean [ Internal ]
             Continue
         }
         Set scanned = scanned + 1
-        Set nf = ##class(ETLWizard.Tools.CsvProfiling).SplitAll(line, sep, .chk)
+        Set nf = ##class(DataIntegrator.Tools.CsvProfiling).SplitAll(line, sep, .chk)
         For k = 1:1:nf {
             Set v = $ZStrip($Get(chk(k)), "<>W")
             If '($Extract(v, 1, 10) ? 2N1"/"2N1"/"4N) {
@@ -358,7 +358,7 @@ ClassMethod HasIsoTimestamp(path As %String, sep As %String, dayFirst As %Boolea
         If $ZStrip(line, "<>W") = "" {
             Continue
         }
-        Set nf = ##class(ETLWizard.Tools.CsvProfiling).SplitAll(line, sep, .chk)
+        Set nf = ##class(DataIntegrator.Tools.CsvProfiling).SplitAll(line, sep, .chk)
         For k = 1:1:nf {
             Set v = $ZStrip($Get(chk(k)), "<>W")
             If ..NormalizeTimestamp(v, dayFirst) '= v {
@@ -425,7 +425,7 @@ ClassMethod HasEmptyRows(path As %String, sep As %String) As %Boolean [ Internal
         If $ZStrip(line, "<>W") = "" {
             Continue
         }
-        Set nf = ##class(ETLWizard.Tools.CsvProfiling).SplitAll(line, sep, .chk)
+        Set nf = ##class(DataIntegrator.Tools.CsvProfiling).SplitAll(line, sep, .chk)
         Set allEmpty = 1
         For k = 1:1:nf {
             If $ZStrip($Get(chk(k)), "<>W") '= "" {
@@ -446,7 +446,7 @@ ClassMethod HasEmptyRows(path As %String, sep As %String) As %Boolean [ Internal
 ClassMethod Validate(fileName As %String, columnDefs As %String, header As %Boolean, separator As %String, Output colList As %String) As %String
 {
     Set colList = ""
-    If '##class(ETLWizard.Tools.Util).ValidColumnDefs(columnDefs) {
+    If '##class(DataIntegrator.Tools.Util).ValidColumnDefs(columnDefs) {
         Return "ERROR: invalid column definition list"
     }
     If (fileName [ "/") || (fileName [ "\") || (fileName [ "..") {
@@ -466,7 +466,7 @@ ClassMethod Validate(fileName As %String, columnDefs As %String, header As %Bool
         // $Length() made a fully quote-wrapped header look like 7 columns when
         // it is one, so validation passed and the LOAD then failed on a name
         // mismatch instead.
-        Set nFile = ##class(ETLWizard.Tools.CsvProfiling).SplitAll(first, ..SepChar(separator), .probe)
+        Set nFile = ##class(DataIntegrator.Tools.CsvProfiling).SplitAll(first, ..SepChar(separator), .probe)
         If nFile '= nCols {
             Return "ERROR: the file's first row has " _ nFile _ " column(s) but the target expects " _
                 nCols _ " (" _ colList _ ") — check the delimiter and header setting"
@@ -545,7 +545,7 @@ ClassMethod SameColumnSet(a As %String, b As %String) As %Boolean [ Internal ]
 ClassMethod Deploy(runId As %String, baseName As %String, fileName As %String, columnDefs As %String, strategy As %String = "full", bulk As %Boolean = 1, header As %Boolean = 1, separator As %String = ",") As %String
 {
     Try {
-        Set util = "ETLWizard.Tools.Util"
+        Set util = "DataIntegrator.Tools.Util"
         If '$ClassMethod(util, "ValidIdent", baseName) {
             // "invalid baseName" on its own named neither the value nor the
             // rule, and the rule that actually bites is the first character:
@@ -560,7 +560,7 @@ ClassMethod Deploy(runId As %String, baseName As %String, fileName As %String, c
         If err '= "" {
             Return err
         }
-        // A bulk load lands in ETLWIZARD.ext_*, beside the mounted sources, NOT
+        // A bulk load lands in DATAINTEGRATOR.ext_*, beside the mounted sources, NOT
         // in ETLW_TARGET. It belongs to the Data Sources tab: it is something to
         // build an ETL FROM, not the output of one. The difference from the
         // other ext_* tables is that this one is a real table holding a copy -
@@ -620,7 +620,7 @@ ClassMethod Deploy(runId As %String, baseName As %String, fileName As %String, c
         Do $ClassMethod(util, "CatalogNode", runId, "source", srcName, "", cfg.%ToJSON())
         Do $ClassMethod(util, "CatalogNode", runId, "bulk_load", baseName _ "_bulk", loadSql, cfg.%ToJSON())
         Do $ClassMethod(util, "CatalogNode", runId, "source_table", target, "", "")
-        Set cat = ##class(ETLWizard.Tools.Catalog).%New()
+        Set cat = ##class(DataIntegrator.Tools.Catalog).%New()
         Do cat.CatalogLink(runId, srcName, baseName _ "_bulk", $Select(bulk: "LOAD BULK DATA", 1: "LOAD DATA"))
         Do cat.CatalogLink(runId, baseName _ "_bulk", target, $Select(strategy = "append": "Append", 1: "Full reload"))
 
@@ -638,8 +638,8 @@ ClassMethod Deploy(runId As %String, baseName As %String, fileName As %String, c
 ClassMethod RunBulkLoad(runId As %String, baseName As %String) As %String
 {
     Try {
-        Set util = "ETLWizard.Tools.Util"
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set util = "DataIntegrator.Tools.Util"
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return "ERROR: run not found: " _ runId
         }
@@ -653,7 +653,7 @@ ClassMethod RunBulkLoad(runId As %String, baseName As %String) As %String
         Set bulk = meta.source.%Get("bulk", 1)
         Set header = meta.source.%Get("header", 1)
         Set separator = meta.source.%Get("separator", ",")
-        // The same table Deploy() built: ETLWIZARD.ext_<base>. This said
+        // The same table Deploy() built: DATAINTEGRATOR.ext_<base>. This said
         // "ETLW_TARGET." _ baseName, a table no bulk load ever creates, so every
         // re-run (manual Run and the production LoadOperation) loaded into
         // nothing - append had nothing to append to.

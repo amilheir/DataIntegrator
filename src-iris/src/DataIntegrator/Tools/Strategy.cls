@@ -1,6 +1,6 @@
 /// Strategy recommendation engine (spec §9). Deterministic rules produce the
 /// scores; the agent only narrates them (spec §27.4.5). Read-only, no gate.
-Class ETLWizard.Tools.Strategy Extends %AI.Tool
+Class DataIntegrator.Tools.Strategy Extends %AI.Tool
 {
 
 /// Recommend load strategies from structured facts. factsJson keys (all

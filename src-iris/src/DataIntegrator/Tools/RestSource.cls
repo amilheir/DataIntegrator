@@ -3,7 +3,7 @@
 /// join them into a single target exactly as it does for JDBC/ODBC tables.
 ///
 ///   GET /customers ──► ETLW_LANDING.<base>_<ep>_raw (payload + run/ts)
-///                 └──► ETLWIZARD.<base>_<ep>  (VIEW via JSON_TABLE)
+///                 └──► DATAINTEGRATOR.<base>_<ep>  (VIEW via JSON_TABLE)
 ///
 /// Two layers on purpose: the landing table keeps the untouched payload (so a
 /// reload replays without re-fetching, and a field appearing upstream can never
@@ -13,7 +13,7 @@
 /// HTTP runs in embedded Python: it gives TLS without an IRIS SSL configuration
 /// (%Net.HttpRequest cannot reach https:// on this instance) plus gzip, which
 /// IBGE returns whether or not you ask for it.
-Class ETLWizard.Tools.RestSource Extends %AI.Tool [ DependsOn = ETLWizard.Tools.Util ]
+Class DataIntegrator.Tools.RestSource Extends %AI.Tool [ DependsOn = DataIntegrator.Tools.Util ]
 {
 
 /// Rows fetched per endpoint in one load, across all pages.
@@ -33,7 +33,7 @@ ClassMethod ProbeEndpoint(url As %String, dataPath As %String = "", headers As %
     import iris, json
     from urllib.parse import urlsplit
 
-    fetch = iris.cls('ETLWizard.Tools.RestSource')
+    fetch = iris.cls('DataIntegrator.Tools.RestSource')
     raw = fetch.HttpGet(url, headers)
     if raw.startswith("ERROR"):
         return raw
@@ -60,7 +60,7 @@ ClassMethod ProbeEndpoint(url As %String, dataPath As %String = "", headers As %
 ClassMethod HttpGet(url As %String, headers As %String = "", timeout As %Integer = 30) As %String [ Language = python ]
 {
     import gzip, urllib.request, urllib.error
-    hdrs = {"Accept": "application/json", "User-Agent": "InterSystems-ETLWizard/1.0"}
+    hdrs = {"Accept": "application/json", "User-Agent": "InterSystems-DataIntegrator/1.0"}
     for line in (headers or "").splitlines():
         if ":" in line:
             k, _, v = line.partition(":")
@@ -174,7 +174,7 @@ ClassMethod InferColumns(itemsJson As %String) As %String [ Language = python ]
     from datetime import datetime
 
     items = json.loads(itemsJson)
-    helper = iris.cls('ETLWizard.Tools.RestSource')
+    helper = iris.cls('DataIntegrator.Tools.RestSource')
     cols, seen = [], set()
 
     def sql_type(values):
@@ -240,7 +240,7 @@ ClassMethod InferColumns(itemsJson As %String) As %String [ Language = python ]
 ClassMethod MountEndpoint(runId As %String, baseName As %String, endpoint As %String, cfgJson As %String) As %String
 {
     Try {
-        If '##class(ETLWizard.Tools.Util).ValidIdent(baseName) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(baseName) {
             Return "ERROR: invalid baseName"
         }
         Set ep = ..SqlName(endpoint)
@@ -249,7 +249,7 @@ ClassMethod MountEndpoint(runId As %String, baseName As %String, endpoint As %St
             Set local = $Extract(baseName, 1, 25) _ "_" _ $Extract(ep, 1, 30)
         }
         Set landing = "ETLW_LANDING." _ local _ "_raw"
-        Set view = "ETLWIZARD." _ local
+        Set view = "DATAINTEGRATOR." _ local
 
         Set cfg = ##class(%DynamicObject).%FromJSON(cfgJson)
         If '$IsObject(cfg.columns) || (cfg.columns.%Size() = 0) {
@@ -263,7 +263,7 @@ ClassMethod MountEndpoint(runId As %String, baseName As %String, endpoint As %St
         }
         Set pages = ##class(%DynamicArray).%FromJSON(pagesJson)
 
-        Set util = "ETLWizard.Tools.Util"
+        Set util = "DataIntegrator.Tools.Util"
         Do $ClassMethod(util, "RunDDL", "DROP VIEW " _ view)
         Do $ClassMethod(util, "RunDDL", "DROP TABLE " _ landing)
         Set err = $ClassMethod(util, "RunDDL",
@@ -333,7 +333,7 @@ ClassMethod FetchPages(cfgJson As %String) As %String [ Language = python ]
 {
     import iris, json
 
-    helper = iris.cls('ETLWizard.Tools.RestSource')
+    helper = iris.cls('DataIntegrator.Tools.RestSource')
     cfg = json.loads(cfgJson)
     url, dataPath, headers = cfg["url"], cfg.get("dataPath", ""), cfg.get("headers", "")
     pg = cfg.get("pagination") or {}

@@ -1,6 +1,6 @@
 /// Read-only CSV inspection tools (spec §10.2). Files live in the dropzone
 /// directory mounted into the container (spec §3.1 source #2).
-Class ETLWizard.Tools.CsvProfiling Extends %AI.Tool [ DependsOn = ETLWizard.Tools.Util ]
+Class DataIntegrator.Tools.CsvProfiling Extends %AI.Tool [ DependsOn = DataIntegrator.Tools.Util ]
 {
 
 Parameter DROPZONE = "/opt/irisbuild/dropzone";

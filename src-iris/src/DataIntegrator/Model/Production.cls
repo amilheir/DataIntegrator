@@ -1,10 +1,10 @@
 /// The generated Ens.Production for a pipeline (spec v2.2 §12.1).
-Class ETLWizard.Model.Production Extends %Persistent
+Class DataIntegrator.Model.Production Extends %Persistent
 {
 
-Property Pipeline As ETLWizard.Model.Pipeline [ Required ];
+Property Pipeline As DataIntegrator.Model.Pipeline [ Required ];
 
-/// e.g. ETLWizard.Prod.customer
+/// e.g. DataIntegrator.Prod.customer
 Property ProductionClass As %String(MAXLEN = 220) [ Required ];
 
 Property Status As %String(VALUELIST = ",stopped,running,troubled") [ InitialExpression = "stopped" ];

@@ -5,7 +5,7 @@ Include %occStatus
 /// Creates the %Embedding.Config row that names the embedding model and endpoint,
 /// and the ETLW_KG schema. Both idempotent, both called from iris.script so a
 /// clean rebuild comes up ready.
-Class ETLWizard.KG.Setup Extends %RegisteredObject
+Class DataIntegrator.KG.Setup Extends %RegisteredObject
 {
 
 /// Name of the %Embedding.Config entry. Vectors are written by our own batch
@@ -60,7 +60,7 @@ ClassMethod CreateEmbeddingConfig() As %String
         }
         Set $Namespace = here
 
-        Set exists = ##class(ETLWizard.Tools.Util).ScalarQuery(
+        Set exists = ##class(DataIntegrator.Tools.Util).ScalarQuery(
             "SELECT COUNT(*) FROM %Embedding.Config WHERE Name = ?", ..#EMBEDCONFIG)
         If +exists > 0 {
             Return ""
@@ -83,7 +83,7 @@ ClassMethod CreateEmbeddingConfig() As %String
         Set config.httpConfig = {"Server": (host), "Https": 0}
         Set config.httpConfig.Port = +port
 
-        Set res = ##class(ETLWizard.Tools.Util).RunDML(
+        Set res = ##class(DataIntegrator.Tools.Util).RunDML(
             "INSERT INTO %Embedding.Config (Name, Configuration, EmbeddingClass, VectorLength, Description) " _
             "VALUES (?, ?, ?, ?, ?)",
             ..#EMBEDCONFIG, config.%ToJSON(), "%Embedding.OpenAI", ..#EMBEDDIMS,
@@ -103,10 +103,10 @@ ClassMethod EmbedEndpoint(Output baseUrl As %String, Output model As %String) As
 {
     Set baseUrl = "", model = ""
     Try {
-        Set json = ##class(ETLWizard.Tools.Util).ScalarQuery(
+        Set json = ##class(DataIntegrator.Tools.Util).ScalarQuery(
             "SELECT Configuration FROM %Embedding.Config WHERE Name = ?", ..#EMBEDCONFIG)
         If ($Extract(json, 1, 5) = "ERROR") || (json = "") {
-            Return "embedding config '" _ ..#EMBEDCONFIG _ "' not found - run ETLWizard.KG.Setup.Install()"
+            Return "embedding config '" _ ..#EMBEDCONFIG _ "' not found - run DataIntegrator.KG.Setup.Install()"
         }
         Set cfg = ##class(%DynamicObject).%FromJSON(json)
         Set http = cfg.%Get("httpConfig")
@@ -181,7 +181,7 @@ ClassMethod CreateSchema(verbose As %Boolean = 0) As %String
         If ..ObjectExists(key) {
             Continue
         }
-        Set res = ##class(ETLWizard.Tools.Util).RunDDL(ddl(key))
+        Set res = ##class(DataIntegrator.Tools.Util).RunDDL(ddl(key))
         If $Extract(res, 1, 5) = "ERROR" {
             Return "creating " _ key _ ": " _ res
         }
@@ -215,13 +215,13 @@ ClassMethod CreateSchema(verbose As %Boolean = 0) As %String
 /// Add a column to an existing ETLW_KG table if it is not there yet.
 ClassMethod EnsureColumn(table As %String, column As %String, type As %String) As %String [ Internal ]
 {
-    Set have = +##class(ETLWizard.Tools.Util).ScalarQuery(
+    Set have = +##class(DataIntegrator.Tools.Util).ScalarQuery(
         "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS " _
         "WHERE TABLE_SCHEMA = 'ETLW_KG' AND TABLE_NAME = ? AND COLUMN_NAME = ?", table, column)
     If have {
         Return ""
     }
-    Set res = ##class(ETLWizard.Tools.Util).RunDDL(
+    Set res = ##class(DataIntegrator.Tools.Util).RunDDL(
         "ALTER TABLE ETLW_KG." _ table _ " ADD COLUMN " _ column _ " " _ type)
     If $Extract(res, 1, 5) = "ERROR" {
         Return "adding " _ table _ "." _ column _ ": " _ res
@@ -241,7 +241,7 @@ ClassMethod ObjectExists(key As %String) As %Boolean [ Internal ]
     If key = "EntityHNSW" {
         Return ..IndexExists("ETLW_KG.Entity", "HNSWEntityIdx")
     }
-    Return +##class(ETLWizard.Tools.Util).ScalarQuery(
+    Return +##class(DataIntegrator.Tools.Util).ScalarQuery(
         "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'ETLW_KG' AND TABLE_NAME = ?",
         key) > 0
 }
@@ -260,7 +260,7 @@ ClassMethod IndexExists(table As %String, indexName As %String) As %Boolean [ In
 /// The persistent class behind a SQL table name.
 ClassMethod ClassForTable(table As %String) As %String [ Internal ]
 {
-    Set res = ##class(ETLWizard.Tools.Util).ScalarQuery(
+    Set res = ##class(DataIntegrator.Tools.Util).ScalarQuery(
         "SELECT TOP 1 CLASSNAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?",
         $Piece(table, ".", 1), $Piece(table, ".", 2))
     If $Extract(res, 1, 5) = "ERROR" {
@@ -288,13 +288,13 @@ ClassMethod MissingIndexes() As %String [ Internal ]
 /// invented a relationship. A clean-generation benchmark (gemma at 32.3 tok/s)
 /// did not predict this at all - extraction is a long structured prompt
 /// demanding JSON, which is a different workload.
-Parameter DEFAULTEXTRACTMODEL = "etlwizard-coder:latest";
+Parameter DEFAULTEXTRACTMODEL = "dataintegrator-coder:latest";
 
 /// Model for the conversational interface. gemma4:e4b is an instruct model and
 /// reads better in prose than the coder, which is what a chat answer is.
 /// Measured 3.23 GB resident, 100% on GPU, despite a 9.61 GB file - never infer
 /// this model's VRAM from its file size.
-Parameter DEFAULTCHATMODEL = "etlwizard-gemma:latest";
+Parameter DEFAULTCHATMODEL = "dataintegrator-gemma:latest";
 
 /// The two roles cannot be resident together: coder 4.99 + gemma 3.23 +
 /// embedder 2.37 = 10.6 GB against 7.8 GB usable. They do not need to be -
@@ -304,13 +304,13 @@ Parameter DEFAULTCHATMODEL = "etlwizard-gemma:latest";
 /// Kept in a global rather than a Config Store profile because this build's
 /// Config Store REJECTS new AI.LLM.* names: Create returns ERROR #26414 "No
 /// descriptor found for AI.LLM". The two profiles that do exist
-/// (AI.LLM.ETLWizard, AI.LLM.ETLWizardSqlGen) predate that restriction and
+/// (AI.LLM.DataIntegrator, AI.LLM.DataIntegratorSqlGen) predate that restriction and
 /// cannot be joined by a third. The provider - endpoint, credentials, provider
-/// class - still comes from AI.LLM.ETLWizard; only the model name is overridden
+/// class - still comes from AI.LLM.DataIntegrator; only the model name is overridden
 /// here, which is the one thing that actually differs.
 ClassMethod GetExtractModel() As %String
 {
-    Set model = $Get(^ETLWizard.KG("extractModel"))
+    Set model = $Get(^DataIntegrator.KG("extractModel"))
     Return $Select(model = "": ..#DEFAULTEXTRACTMODEL, 1: model)
 }
 
@@ -320,13 +320,13 @@ ClassMethod SetExtractModel(model As %String) As %String
     If model = "" {
         Return "a model name is required"
     }
-    Set ^ETLWizard.KG("extractModel") = model
+    Set ^DataIntegrator.KG("extractModel") = model
     Return ""
 }
 
 ClassMethod GetChatModel() As %String
 {
-    Set model = $Get(^ETLWizard.KG("chatModel"))
+    Set model = $Get(^DataIntegrator.KG("chatModel"))
     Return $Select(model = "": ..#DEFAULTCHATMODEL, 1: model)
 }
 
@@ -336,7 +336,7 @@ ClassMethod SetChatModel(model As %String) As %String
     If model = "" {
         Return "a model name is required"
     }
-    Set ^ETLWizard.KG("chatModel") = model
+    Set ^DataIntegrator.KG("chatModel") = model
     Return ""
 }
 
@@ -359,7 +359,7 @@ ClassMethod Round(value As %String, places As %Integer = 3) As %Numeric
 ClassMethod DropSchema() As %String
 {
     For table = "Ask", "Mention", "Relationship", "Entity", "Chunk", "Doc", "Corpus" {
-        Do ##class(ETLWizard.Tools.Util).RunDDL("DROP TABLE ETLW_KG." _ table)
+        Do ##class(DataIntegrator.Tools.Util).RunDDL("DROP TABLE ETLW_KG." _ table)
     }
     Return ""
 }

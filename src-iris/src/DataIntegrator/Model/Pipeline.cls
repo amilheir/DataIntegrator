@@ -1,6 +1,6 @@
 /// A pipeline definition created by the wizard (spec §12.1).
 /// MetadataJson holds the canonical pipeline metadata shape (spec §12.2).
-Class ETLWizard.Model.Pipeline Extends %Persistent
+Class DataIntegrator.Model.Pipeline Extends %Persistent
 {
 
 Property Name As %String(MAXLEN = 128) [ Required ];

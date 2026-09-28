@@ -8,7 +8,7 @@
 ///
 /// AutoML is the only provider usable on this image; see ml-models-tab-plan.md
 /// §2 for the install and its two traps (root/chown, durable %SYS).
-Class ETLWizard.Tools.MLModel Extends %RegisteredObject
+Class DataIntegrator.Tools.MLModel Extends %RegisteredObject
 {
 
 /// Models with their trained/validated state, for the picker.
@@ -74,19 +74,19 @@ ClassMethod HasValidation(name As %String) As %Boolean
     Return 0
 }
 
-/// Columns of an ETLWIZARD table, with the date/time ones flagged so the
+/// Columns of an DATAINTEGRATOR table, with the date/time ones flagged so the
 /// frontend can restrict the time-column picker (plan §9).
 ClassMethod TableColumns(table As %String) As %DynamicArray
 {
     Set out = []
     Try {
         // Honour the schema the caller actually named. This was pinned to
-        // 'ETLWIZARD', so a model could only ever be built over a mounted
+        // 'DATAINTEGRATOR', so a model could only ever be built over a mounted
         // foreign table - asking for ETLW_TARGET.<result> returned an empty
         // column list and the ML step silently offered nothing to predict.
         // The wizard's own target IS the table worth training on.
         Set bare = $Piece(table, ".", *)
-        Set schema = $Select(table [ ".": $Piece(table, ".", 1), 1: "ETLWIZARD")
+        Set schema = $Select(table [ ".": $Piece(table, ".", 1), 1: "DATAINTEGRATOR")
         Set stmt = ##class(%SQL.Statement).%New()
         Set sc = stmt.%Prepare("SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS "_
                                  "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION")
@@ -352,7 +352,7 @@ ClassMethod TrainAsync(name As %String, table As %String = "", using As %Dynamic
         Set clause = ..UsingClause(merged)
         // JOB only sets $TEST when a timeout is supplied; without one the
         // check below always fails even though the job started fine.
-        Job ##class(ETLWizard.Tools.MLModel).TrainJob(name, table, clause)::5
+        Job ##class(DataIntegrator.Tools.MLModel).TrainJob(name, table, clause)::5
         If '$Test {
             Set error = "could not start the training job"
             Return 0
@@ -464,7 +464,7 @@ ClassMethod TerminatedHint(name As %String) As %String [ Internal ]
         If $$$ISOK(sc) {
             Set rs = stmt.%Execute(name)
             If rs.%Next() {
-                // "SELECT * FROM  ETLWIZARD . ext_x" - IRIS pads the dots
+                // "SELECT * FROM  DATAINTEGRATOR . ext_x" - IRIS pads the dots
                 Set query = rs.%GetData(1)
                 Set table = $ZStrip($Piece(query, " FROM ", 2), "<>W")
                 If table '= "" {
@@ -580,7 +580,7 @@ ClassMethod ScorableSource(name As %String, table As %String, Output excluded As
         // it the same way before use
         Set target = rs.%GetData(1)
         Set:(target [ ".") target = $Piece(target, ".", 2)
-        If '##class(ETLWizard.Tools.Util).ValidIdent(target) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(target) {
             Return table
         }
         Set cnt = ##class(%SQL.Statement).%ExecDirect(,
@@ -681,7 +681,7 @@ ClassMethod Predict(name As %String, table As %String, forClass As %String = "",
             Set names = names _ $Select(names = "": "", 1: ",") _ nm
             Do out.columns.%Push(nm)
             Set defs = defs _ $Select(defs = "": "", 1: ", ") _ nm _ " " _
-                ##class(ETLWizard.Tools.Util).ODBCToDDL(col.ODBCType, col.precision, col.scale)
+                ##class(DataIntegrator.Tools.Util).ODBCToDDL(col.ODBCType, col.precision, col.scale)
         }
         Set out.columnDefs = defs
         Set objRows = []
@@ -723,7 +723,7 @@ ClassMethod Graph(name As %String) As %DynamicObject
         Set trained = rs.%GetData(3)
 
         // Source table from the recorded training query. IRIS stores it with
-        // spaces around the qualifier - "SELECT * FROM  ETLWIZARD . ml_smoke" -
+        // spaces around the qualifier - "SELECT * FROM  DATAINTEGRATOR . ml_smoke" -
         // so cut at the first trailing clause, then squeeze the spaces out.
         Set source = ""
         If $ZConvert(query, "U") [ " FROM " {
@@ -814,7 +814,7 @@ ClassMethod Headline(metrics As %DynamicArray) As %String
 /// tree - with durable %SYS that is what the running instance reads.
 ClassMethod CustomRoot() As %String
 {
-    Return "/opt/irisbuild/data/mgr/python/etlwizard_models"
+    Return "/opt/irisbuild/data/mgr/python/dataintegrator_models"
 }
 
 /// Directory holding one custom model's file.

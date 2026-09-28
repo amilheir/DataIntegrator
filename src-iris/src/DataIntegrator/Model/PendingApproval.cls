@@ -1,10 +1,10 @@
 /// Backing store for the authorization policy (spec §10.3, §12.1).
 /// Every destructive tool call suspends here until a human resolves it via
 /// POST /api/runs/:id/approvals/:aid.
-Class ETLWizard.Model.PendingApproval Extends %Persistent
+Class DataIntegrator.Model.PendingApproval Extends %Persistent
 {
 
-Property Run As ETLWizard.Model.Run [ Required ];
+Property Run As DataIntegrator.Model.Run [ Required ];
 
 /// Tool name whose execution is suspended
 Property Tool As %String(MAXLEN = 128) [ Required ];

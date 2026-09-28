@@ -2,7 +2,7 @@
 /// annotations. Every mutation appends an event, which is what drives the
 /// real-time canvas. Read-only + catalog writes only — no DDL here, so no
 /// auth gate (destructive verbs live in their own REQUIRESAUTH classes, P1+).
-Class ETLWizard.Tools.Catalog Extends %AI.Tool [ DependsOn = (ETLWizard.Model.Node, ETLWizard.Model.Edge) ]
+Class DataIntegrator.Tools.Catalog Extends %AI.Tool [ DependsOn = (DataIntegrator.Model.Node, DataIntegrator.Model.Edge) ]
 {
 
 /// Record a pipeline artifact node in the catalog. kind must be one of:
@@ -12,11 +12,11 @@ Class ETLWizard.Tools.Catalog Extends %AI.Tool [ DependsOn = (ETLWizard.Model.No
 Method CatalogRecord(runId As %String, kind As %String, name As %String, sqlText As %String = "", configJson As %String = "") As %String
 {
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return "ERROR: run not found: " _ runId
         }
-        Set node = ##class(ETLWizard.Model.Node).%New()
+        Set node = ##class(DataIntegrator.Model.Node).%New()
         Set node.Pipeline = run.Pipeline
         Set node.Kind = kind
         Set node.Name = name
@@ -27,7 +27,7 @@ Method CatalogRecord(runId As %String, kind As %String, name As %String, sqlText
         If $$$ISERR(sc) {
             Return "ERROR: " _ $System.Status.GetErrorText(sc)
         }
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.created", node.%Id(),
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.created", node.%Id(),
             {"nodeId": (node.%Id()), "kind": (kind), "name": (name)})
         Return "Created node " _ node.%Id() _ " (" _ kind _ ": " _ name _ ")"
     } Catch ex {
@@ -41,20 +41,20 @@ Method CatalogRecord(runId As %String, kind As %String, name As %String, sqlText
 Method CatalogLink(runId As %String, fromName As %String, toName As %String, label As %String = "") As %String
 {
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return "ERROR: run not found: " _ runId
         }
         Set pipelineId = run.Pipeline.%Id()
-        Set fromNode = ##class(ETLWizard.Model.Node).PipelineNameIdxOpen(pipelineId, fromName)
+        Set fromNode = ##class(DataIntegrator.Model.Node).PipelineNameIdxOpen(pipelineId, fromName)
         If '$IsObject(fromNode) {
             Return "ERROR: node not found: " _ fromName
         }
-        Set toNode = ##class(ETLWizard.Model.Node).PipelineNameIdxOpen(pipelineId, toName)
+        Set toNode = ##class(DataIntegrator.Model.Node).PipelineNameIdxOpen(pipelineId, toName)
         If '$IsObject(toNode) {
             Return "ERROR: node not found: " _ toName
         }
-        Set edge = ##class(ETLWizard.Model.Edge).%New()
+        Set edge = ##class(DataIntegrator.Model.Edge).%New()
         Set edge.Pipeline = run.Pipeline
         Set edge.FromNode = fromNode
         Set edge.ToNode = toNode
@@ -63,7 +63,7 @@ Method CatalogLink(runId As %String, fromName As %String, toName As %String, lab
         If $$$ISERR(sc) {
             Return "ERROR: " _ $System.Status.GetErrorText(sc)
         }
-        Do ##class(ETLWizard.Model.Event).Append(runId, "edge.created", edge.%Id(),
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "edge.created", edge.%Id(),
             {"edgeId": (edge.%Id()), "from": (fromNode.%Id()), "to": (toNode.%Id()), "label": (label)})
         Return "Created edge " _ fromName _ " -> " _ toName
     } Catch ex {
@@ -77,11 +77,11 @@ Method CatalogLink(runId As %String, fromName As %String, toName As %String, lab
 Method UpdateNodeStatus(runId As %String, nodeName As %String, status As %String) As %String
 {
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return "ERROR: run not found: " _ runId
         }
-        Set node = ##class(ETLWizard.Model.Node).PipelineNameIdxOpen(run.Pipeline.%Id(), nodeName)
+        Set node = ##class(DataIntegrator.Model.Node).PipelineNameIdxOpen(run.Pipeline.%Id(), nodeName)
         If '$IsObject(node) {
             Return "ERROR: node not found: " _ nodeName
         }
@@ -90,7 +90,7 @@ Method UpdateNodeStatus(runId As %String, nodeName As %String, status As %String
         If $$$ISERR(sc) {
             Return "ERROR: " _ $System.Status.GetErrorText(sc)
         }
-        Do ##class(ETLWizard.Model.Event).Append(runId, "node.status", node.%Id(),
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "node.status", node.%Id(),
             {"nodeId": (node.%Id()), "name": (nodeName), "status": (status)})
         Return "Node " _ nodeName _ " -> " _ status
     } Catch ex {
@@ -102,7 +102,7 @@ Method UpdateNodeStatus(runId As %String, nodeName As %String, status As %String
 Method EmitNote(runId As %String, note As %String) As %String
 {
     Try {
-        Set sc = ##class(ETLWizard.Model.Event).Append(runId, "agent.note", "",
+        Set sc = ##class(DataIntegrator.Model.Event).Append(runId, "agent.note", "",
             {"role": "agent", "text": (note)})
         If $$$ISERR(sc) {
             Return "ERROR: " _ $System.Status.GetErrorText(sc)
@@ -119,7 +119,7 @@ Method EmitNote(runId As %String, note As %String) As %String
 Method SetPipelineMetadata(runId As %String, metadataJson As %String, status As %String = "") As %String
 {
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return "ERROR: run not found: " _ runId
         }
@@ -137,7 +137,7 @@ Method SetPipelineMetadata(runId As %String, metadataJson As %String, status As 
         If $$$ISERR(sc) {
             Return "ERROR: " _ $System.Status.GetErrorText(sc)
         }
-        Do ##class(ETLWizard.Model.Event).Append(runId, "plan.updated", "",
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "plan.updated", "",
             {"pipelineId": (pipeline.%Id()), "status": (pipeline.Status)})
         Return "Pipeline metadata saved" _ $Select(status '= "": ", status " _ status, 1: "")
     } Catch ex {
@@ -151,21 +151,21 @@ Method SetPipelineMetadata(runId As %String, metadataJson As %String, status As 
 Method PlanProduction(runId As %String) As %String
 {
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return "ERROR: run not found: " _ runId
         }
-        Set err = ##class(ETLWizard.Runtime.Executor).ParsePlan(run.Pipeline, .baseName, .foreignTable, .wmColumn, .mode)
+        Set err = ##class(DataIntegrator.Runtime.Executor).ParsePlan(run.Pipeline, .baseName, .foreignTable, .wmColumn, .mode)
         If err '= "" {
             Return err
         }
-        Return {"productionClass": ("ETLWizard.Prod." _ baseName),
+        Return {"productionClass": ("DataIntegrator.Prod." _ baseName),
                 "items": [
-                  {"name": "ExtractService", "role": "business_service", "class": "ETLWizard.Host.ExtractService",
+                  {"name": "ExtractService", "role": "business_service", "class": "DataIntegrator.Host.ExtractService",
                    "purpose": ("polls and extracts " _ foreignTable _ " (" _ mode _ ")"), "schedule": "CallInterval seconds"},
-                  {"name": "Orchestrator", "role": "business_process", "class": "ETLWizard.Host.Orchestrator",
+                  {"name": "Orchestrator", "role": "business_process", "class": "DataIntegrator.Host.Orchestrator",
                    "purpose": "land -> stage -> validate -> route to load"},
-                  {"name": "LoadOperation", "role": "business_operation", "class": "ETLWizard.Host.LoadOperation",
+                  {"name": "LoadOperation", "role": "business_operation", "class": "DataIntegrator.Host.LoadOperation",
                    "purpose": ("merge/insert into ETLW_TARGET." _ baseName _ ", watermark, reconcile")}
                 ]}.%ToJSON()
     } Catch ex {
@@ -192,7 +192,7 @@ Method LintSql(sql As %String) As %String
             Do warnings.%Push("unexpected leading verb '" _ verb _ "'")
         }
         Set upper = $ZConvert(trimmed, "U")
-        If (upper [ "ETLWIZARD.") && ((upper [ "ETLW_TARGET.") || (upper [ "ETLW_STAGING.")) &&
+        If (upper [ "DATAINTEGRATOR.") && ((upper [ "ETLW_TARGET.") || (upper [ "ETLW_STAGING.")) &&
            (upper [ "=") && ('(upper [ "%SQLUPPER")) {
             Do warnings.%Push("collation risk: foreign tables default to EXACT collation while local tables are SQLUPPER - string joins/filters may silently mismatch; wrap both sides in %SQLUPPER(...)")
         }
@@ -207,12 +207,12 @@ Method LintSql(sql As %String) As %String
 Method SuggestMasking(foreignTable As %String) As %String
 {
     Try {
-        If '##class(ETLWizard.Tools.Util).ValidIdent(foreignTable) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(foreignTable) {
             Return "ERROR: invalid foreignTable"
         }
         Set stmt = ##class(%SQL.Statement).%New()
         Set sc = stmt.%Prepare("SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS " _
-            "WHERE TABLE_SCHEMA = 'ETLWIZARD' AND TABLE_NAME = '" _ foreignTable _ "' ORDER BY ORDINAL_POSITION")
+            "WHERE TABLE_SCHEMA = 'DATAINTEGRATOR' AND TABLE_NAME = '" _ foreignTable _ "' ORDER BY ORDINAL_POSITION")
         If $$$ISERR(sc) {
             Return "ERROR: " _ $System.Status.GetErrorText(sc)
         }
@@ -259,14 +259,14 @@ Method SuggestMasking(foreignTable As %String) As %String
 Method GenerateDocs(runId As %String) As %String
 {
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return "ERROR: run not found: " _ runId
         }
         Set pipeline = run.Pipeline
         Set nl = $Char(10)
         Set md = "# Pipeline: " _ pipeline.Name _ nl _ nl
-        Set md = md _ "Generated " _ $ZDateTime($ZTimeStamp, 3) _ " by the ETL Wizard docs generator." _ nl
+        Set md = md _ "Generated " _ $ZDateTime($ZTimeStamp, 3) _ " by the Data Integrator docs generator." _ nl
         Set md = md _ "Status: **" _ pipeline.Status _ "** - Owner: " _ pipeline.Owner _ nl _ nl
         If pipeline.Description '= "" {
             Set md = md _ pipeline.Description _ nl _ nl
@@ -274,25 +274,25 @@ Method GenerateDocs(runId As %String) As %String
         If pipeline.MetadataJson '= "" {
             Set md = md _ "## Metadata (spec 12.2)" _ nl _ nl _ "```json" _ nl _ pipeline.MetadataJson _ nl _ "```" _ nl _ nl
         }
-        Set wm = ##class(ETLWizard.Model.Watermark).PipelineIdxOpen(pipeline.%Id())
+        Set wm = ##class(DataIntegrator.Model.Watermark).PipelineIdxOpen(pipeline.%Id())
         If $IsObject(wm) {
             Set md = md _ "## Watermark" _ nl _ nl _ "| Type | Column | Last value | Updated |" _ nl _ "|---|---|---|---|" _ nl
             Set md = md _ "| " _ wm.Type _ " | " _ wm.ColumnName _ " | " _ wm.LastValue _ " | " _ wm.UpdatedAt _ " |" _ nl _ nl
         }
-        Set prod = ##class(ETLWizard.Model.Production).PipelineIdxOpen(pipeline.%Id())
+        Set prod = ##class(DataIntegrator.Model.Production).PipelineIdxOpen(pipeline.%Id())
         If $IsObject(prod) {
             Set md = md _ "## Interoperability Production" _ nl _ nl
             Set md = md _ "Class `" _ prod.ProductionClass _ "` - status " _ prod.Status _ nl _ nl
         }
         Set md = md _ "## Nodes" _ nl _ nl
         Set stmt = ##class(%SQL.Statement).%New()
-        Set sc = stmt.%Prepare("SELECT ID FROM ETLWizard_Model.Node WHERE Pipeline = ? ORDER BY ID")
+        Set sc = stmt.%Prepare("SELECT ID FROM DataIntegrator_Model.Node WHERE Pipeline = ? ORDER BY ID")
         If $$$ISERR(sc) {
             Return "ERROR: " _ $System.Status.GetErrorText(sc)
         }
         Set rs = stmt.%Execute(pipeline.%Id())
         While rs.%Next() {
-            Set node = ##class(ETLWizard.Model.Node).%OpenId(rs.ID)
+            Set node = ##class(DataIntegrator.Model.Node).%OpenId(rs.ID)
             If '$IsObject(node) {
                 Continue
             }
@@ -311,11 +311,11 @@ Method GenerateDocs(runId As %String) As %String
         }
         Set md = md _ "## Lineage" _ nl _ nl
         Set stmt2 = ##class(%SQL.Statement).%New()
-        Set sc = stmt2.%Prepare("SELECT ID FROM ETLWizard_Model.Edge WHERE Pipeline = ? ORDER BY ID")
+        Set sc = stmt2.%Prepare("SELECT ID FROM DataIntegrator_Model.Edge WHERE Pipeline = ? ORDER BY ID")
         If $$$ISOK(sc) {
             Set rs2 = stmt2.%Execute(pipeline.%Id())
             While rs2.%Next() {
-                Set edge = ##class(ETLWizard.Model.Edge).%OpenId(rs2.ID)
+                Set edge = ##class(DataIntegrator.Model.Edge).%OpenId(rs2.ID)
                 If '$IsObject(edge) {
                     Continue
                 }
@@ -324,11 +324,11 @@ Method GenerateDocs(runId As %String) As %String
         }
         Set md = md _ nl _ "## Recent runs" _ nl _ nl _ "| Run | Status | Trigger | Started | Finished |" _ nl _ "|---|---|---|---|---|" _ nl
         Set stmt3 = ##class(%SQL.Statement).%New()
-        Set sc = stmt3.%Prepare("SELECT TOP 10 ID FROM ETLWizard_Model.Run WHERE Pipeline = ? ORDER BY ID DESC")
+        Set sc = stmt3.%Prepare("SELECT TOP 10 ID FROM DataIntegrator_Model.Run WHERE Pipeline = ? ORDER BY ID DESC")
         If $$$ISOK(sc) {
             Set rs3 = stmt3.%Execute(pipeline.%Id())
             While rs3.%Next() {
-                Set r = ##class(ETLWizard.Model.Run).%OpenId(rs3.ID)
+                Set r = ##class(DataIntegrator.Model.Run).%OpenId(rs3.ID)
                 If '$IsObject(r) {
                     Continue
                 }
@@ -349,7 +349,7 @@ Method GenerateDocs(runId As %String) As %String
         If $$$ISERR(sc) {
             Return "ERROR: " _ $System.Status.GetErrorText(sc)
         }
-        Do ##class(ETLWizard.Model.Event).Append(runId, "agent.note", "",
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "agent.note", "",
             {"role": "agent", "text": ("Documentation generated: " _ fileName)})
         Return "Documentation written to " _ fileName _ " (" _ $Length(md) _ " chars)"
     } Catch ex {
@@ -361,7 +361,7 @@ Method GenerateDocs(runId As %String) As %String
 Method GetPipelineGraph(runId As %String) As %String
 {
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return "ERROR: run not found: " _ runId
         }
@@ -369,26 +369,26 @@ Method GetPipelineGraph(runId As %String) As %String
         Set nodes = []
         Set edges = []
         Set stmt = ##class(%SQL.Statement).%New()
-        Set sc = stmt.%Prepare("SELECT ID FROM ETLWizard_Model.Node WHERE Pipeline = ? ORDER BY ID")
+        Set sc = stmt.%Prepare("SELECT ID FROM DataIntegrator_Model.Node WHERE Pipeline = ? ORDER BY ID")
         If $$$ISERR(sc) {
             Return "ERROR: " _ $System.Status.GetErrorText(sc)
         }
         Set rs = stmt.%Execute(pipelineId)
         While rs.%Next() {
-            Set node = ##class(ETLWizard.Model.Node).%OpenId(rs.ID)
+            Set node = ##class(DataIntegrator.Model.Node).%OpenId(rs.ID)
             If '$IsObject(node) {
                 Continue
             }
             Do nodes.%Push(node.ToJSON())
         }
         Set stmt2 = ##class(%SQL.Statement).%New()
-        Set sc = stmt2.%Prepare("SELECT ID FROM ETLWizard_Model.Edge WHERE Pipeline = ? ORDER BY ID")
+        Set sc = stmt2.%Prepare("SELECT ID FROM DataIntegrator_Model.Edge WHERE Pipeline = ? ORDER BY ID")
         If $$$ISERR(sc) {
             Return "ERROR: " _ $System.Status.GetErrorText(sc)
         }
         Set rs2 = stmt2.%Execute(pipelineId)
         While rs2.%Next() {
-            Set edge = ##class(ETLWizard.Model.Edge).%OpenId(rs2.ID)
+            Set edge = ##class(DataIntegrator.Model.Edge).%OpenId(rs2.ID)
             If '$IsObject(edge) {
                 Continue
             }

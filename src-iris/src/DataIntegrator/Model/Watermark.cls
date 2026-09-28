@@ -1,9 +1,9 @@
 /// Per-pipeline incremental-load watermark (spec §7, §12.1).
 /// Updated only on successful runs; resumable/reprocessable by range (spec §15, §17).
-Class ETLWizard.Model.Watermark Extends %Persistent
+Class DataIntegrator.Model.Watermark Extends %Persistent
 {
 
-Property Pipeline As ETLWizard.Model.Pipeline [ Required ];
+Property Pipeline As DataIntegrator.Model.Pipeline [ Required ];
 
 Property Type As %String(VALUELIST = ",timestamp,numeric") [ Required ];
 
@@ -12,7 +12,7 @@ Property ColumnName As %String(MAXLEN = 128) [ Required ];
 
 Property LastValue As %String(MAXLEN = 256);
 
-Property UpdatedByRun As ETLWizard.Model.Run;
+Property UpdatedByRun As DataIntegrator.Model.Run;
 
 Property UpdatedAt As %TimeStamp;
 

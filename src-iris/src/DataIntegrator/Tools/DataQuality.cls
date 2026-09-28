@@ -1,21 +1,21 @@
 /// Data-quality check tools (spec §10.2) — P2 scope: run checks and report;
 /// quarantine table generation lands in P4. Read-only, no gate.
 /// Table arguments accept the layer-qualified names the wizard uses
-/// (e.g. ETLW_TARGET.customer, ETLWIZARD.ext_customer).
-Class ETLWizard.Tools.DataQuality Extends %AI.Tool [ DependsOn = ETLWizard.Tools.Util ]
+/// (e.g. ETLW_TARGET.customer, DATAINTEGRATOR.ext_customer).
+Class DataIntegrator.Tools.DataQuality Extends %AI.Tool [ DependsOn = DataIntegrator.Tools.Util ]
 {
 
 /// Count NULL / empty values in one column of a table.
 Method NullCheck(runId As %String, tableName As %String, columnName As %String) As %String
 {
     Try {
-        If '##class(ETLWizard.Tools.Util).ValidQualified(tableName) {
+        If '##class(DataIntegrator.Tools.Util).ValidQualified(tableName) {
             Return "ERROR: invalid table name"
         }
-        If '##class(ETLWizard.Tools.Util).ValidIdent(columnName) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(columnName) {
             Return "ERROR: invalid column name"
         }
-        Set result = ##class(ETLWizard.Tools.Util).RunSelect(
+        Set result = ##class(DataIntegrator.Tools.Util).RunSelect(
             "SELECT COUNT(*) AS total_rows, SUM(CASE WHEN " _ columnName _ " IS NULL THEN 1 ELSE 0 END) AS null_rows FROM " _ tableName, 1)
         Do ..EmitCheck(runId, "null_check", tableName _ "." _ columnName, result)
         Return result
@@ -28,15 +28,15 @@ Method NullCheck(runId As %String, tableName As %String, columnName As %String) 
 Method UniqueCheck(runId As %String, tableName As %String, columns As %String) As %String
 {
     Try {
-        If '##class(ETLWizard.Tools.Util).ValidQualified(tableName) {
+        If '##class(DataIntegrator.Tools.Util).ValidQualified(tableName) {
             Return "ERROR: invalid table name"
         }
         For i = 1:1:$Length(columns, ",") {
-            If '##class(ETLWizard.Tools.Util).ValidIdent($ZStrip($Piece(columns, ",", i), "<>W")) {
+            If '##class(DataIntegrator.Tools.Util).ValidIdent($ZStrip($Piece(columns, ",", i), "<>W")) {
                 Return "ERROR: invalid column list"
             }
         }
-        Set result = ##class(ETLWizard.Tools.Util).RunSelect(
+        Set result = ##class(DataIntegrator.Tools.Util).RunSelect(
             "SELECT COUNT(*) AS duplicate_groups FROM (SELECT " _ columns _ " FROM " _ tableName _
             " GROUP BY " _ columns _ " HAVING COUNT(*) > 1)", 1)
         Do ..EmitCheck(runId, "unique_check", tableName _ "(" _ columns _ ")", result)
@@ -50,17 +50,17 @@ Method UniqueCheck(runId As %String, tableName As %String, columns As %String) A
 Method ReconcileCounts(runId As %String, sourceTable As %String, targetTable As %String) As %String
 {
     Try {
-        If '##class(ETLWizard.Tools.Util).ValidQualified(sourceTable) {
+        If '##class(DataIntegrator.Tools.Util).ValidQualified(sourceTable) {
             Return "ERROR: invalid source table"
         }
-        If '##class(ETLWizard.Tools.Util).ValidQualified(targetTable) {
+        If '##class(DataIntegrator.Tools.Util).ValidQualified(targetTable) {
             Return "ERROR: invalid target table"
         }
-        Set src = ##class(ETLWizard.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ sourceTable)
+        Set src = ##class(DataIntegrator.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ sourceTable)
         If $Extract(src, 1, 5) = "ERROR" {
             Return src
         }
-        Set tgt = ##class(ETLWizard.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ targetTable)
+        Set tgt = ##class(DataIntegrator.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ targetTable)
         If $Extract(tgt, 1, 5) = "ERROR" {
             Return tgt
         }
@@ -86,7 +86,7 @@ ClassMethod EmitCheck(runId As %String, checkType As %String, subject As %String
         } Catch {
             Set payload.result = resultJson
         }
-        Do ##class(ETLWizard.Model.Event).Append(runId, "check.result", "", payload)
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "check.result", "", payload)
     } Catch {
     }
 }

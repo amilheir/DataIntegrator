@@ -1,7 +1,7 @@
 {
     "objectscript.conn": {
         "server": "aihub",
-        "ns": "ETLWIZARD",
+        "ns": "DATAINTEGRATOR",
         "active": false
     }
 }

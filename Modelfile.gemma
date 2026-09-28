@@ -1,7 +1,7 @@
 # 8192-context build of gemma4:e4b for the frontend model picker.
 #
-# Build with: ollama create etlwizard-gemma -f Modelfile.gemma
-#   docker exec irisetlwizard-ollama-1 ollama create etlwizard-gemma -f /Modelfile.gemma
+# Build with: ollama create dataintegrator-gemma -f Modelfile.gemma
+#   docker exec dataintegrator-ollama-1 ollama create dataintegrator-gemma -f /Modelfile.gemma
 #
 # 4096 (the stock default) is NOT enough: the architect prompt is ~4100 tokens
 # and Ollama truncates silently rather than erroring - the symptom is an empty

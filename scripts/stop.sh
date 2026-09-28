@@ -1,5 +1,5 @@
 #!/bin/sh
-# Graceful shutdown for the ETL Wizard stack.
+# Graceful shutdown for the Data Integrator stack.
 #
 # Use this INSTEAD of `docker compose down` / `docker compose stop`.
 #
@@ -22,7 +22,7 @@
 
 set -e
 
-CONTAINER="${1:-irisetlwizard-iris-1}"
+CONTAINER="${1:-dataintegrator-iris-1}"
 
 if docker ps --format '{{.Names}}' | grep -qx "$CONTAINER"; then
     echo "== flushing IRIS in $CONTAINER"

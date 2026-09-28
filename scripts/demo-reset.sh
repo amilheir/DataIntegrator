@@ -20,17 +20,17 @@
 
 set -e
 
-IRIS_C="${IRIS_C:-irisetlwizard-iris-1}"
-PG_C="${PG_C:-irisetlwizard-postgres-1}"
-OLLAMA_C="${OLLAMA_C:-irisetlwizard-ollama-1}"
+IRIS_C="${IRIS_C:-dataintegrator-iris-1}"
+PG_C="${PG_C:-dataintegrator-postgres-1}"
+OLLAMA_C="${OLLAMA_C:-dataintegrator-ollama-1}"
 BASE="${BASE:-http://localhost:52773}"
 AUTH="${AUTH:-_SYSTEM:SYS}"
-NS="${NS:-ETLWIZARD}"
+NS="${NS:-DATAINTEGRATOR}"
 ROOT="$(dirname "$0")/.."
 
 START=$(date +%s)
 echo "== 1/7  clearing pipelines and wizard-built objects"
-curl -s -u "$AUTH" -X POST "$BASE/etlwizard/api/clear-all" | head -c 300
+curl -s -u "$AUTH" -X POST "$BASE/dataintegrator/api/clear-all" | head -c 300
 echo
 
 # The SOURCES are restored before anything is mounted over them. A foreign
@@ -55,20 +55,20 @@ if [ ! -f "$ROOT/src-iris/dropzone/daily_sales.csv" ]; then
 fi
 
 echo "== 4/7  re-creating the connection and the foreign servers"
-printf 'do ##class(ETLWizard.Setup).PrepareServers()\nhalt\n' \
+printf 'do ##class(DataIntegrator.Setup).PrepareServers()\nhalt\n' \
   | docker exec -i "$IRIS_C" iris session IRIS -U "$NS" | tr -d '\r' | sed 's/^/     /'
 
 # A SEPARATE session on purpose: a foreign server created in one process is not
 # visible to the schema importer in that same process, and the mount fails with
 # "SQLCODE -237: Failed to craft query string for schema import". Waiting inside
-# the first session does not fix it - see ETLWizard.Setup.PrepareServers().
+# the first session does not fix it - see DataIntegrator.Setup.PrepareServers().
 echo "== 5/7  re-mounting the demo tables (new session - see the -237 note)"
-printf 'do ##class(ETLWizard.Setup).MountDemoTables()\nhalt\n' \
+printf 'do ##class(DataIntegrator.Setup).MountDemoTables()\nhalt\n' \
   | docker exec -i "$IRIS_C" iris session IRIS -U "$NS" | tr -d '\r' | sed 's/^/     /'
 
 echo "== 6/7  re-warming the LLM"
-MODEL=$(curl -s -u "$AUTH" "$BASE/etlwizard/api/models" | sed -n 's/.*"active":"\([^"]*\)".*/\1/p')
-MODEL=${MODEL:-etlwizard-coder:latest}
+MODEL=$(curl -s -u "$AUTH" "$BASE/dataintegrator/api/models" | sed -n 's/.*"active":"\([^"]*\)".*/\1/p')
+MODEL=${MODEL:-dataintegrator-coder:latest}
 docker exec -i "$OLLAMA_C" ollama run "$MODEL" "reply with the single word ready" > /dev/null 2>&1 \
   && echo "     $MODEL is resident and answering" \
   || echo "     !! $MODEL did not answer - check the ollama container"

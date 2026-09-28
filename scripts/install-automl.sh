@@ -14,7 +14,7 @@
 #   sh scripts/install-automl.sh [container]
 
 set -e
-C="${1:-irisetlwizard-iris-1}"
+C="${1:-dataintegrator-iris-1}"
 SRC=/usr/irissys/mgr/python
 DST=/opt/irisbuild/data/mgr/python
 

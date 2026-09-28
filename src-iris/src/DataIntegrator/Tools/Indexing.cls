@@ -14,7 +14,7 @@
 /// the local model to reconsider them against what the column NAMES mean — a
 /// rule sees "20 distinct values", the model sees "status". CreateIndexes is
 /// DDL and gated, so nothing is built until the user approves the list.
-Class ETLWizard.Tools.Indexing Extends %AI.Tool [ DependsOn = ETLWizard.Tools.Util ]
+Class DataIntegrator.Tools.Indexing Extends %AI.Tool [ DependsOn = DataIntegrator.Tools.Util ]
 {
 
 /// Rows above which COUNT(DISTINCT) is estimated from a sample instead of
@@ -28,11 +28,11 @@ Parameter SAMPLEROWS = 50000;
 Method ProfileTarget(baseName As %String) As %String
 {
     Try {
-        If '##class(ETLWizard.Tools.Util).ValidIdent(baseName) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(baseName) {
             Return "ERROR: invalid baseName"
         }
         Set table = "ETLW_TARGET." _ baseName
-        Set rows = ##class(ETLWizard.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ table)
+        Set rows = ##class(DataIntegrator.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ table)
         If $Extract(rows, 1, 5) = "ERROR" {
             Return "ERROR: target table " _ table _ " not found - deploy the pipeline first"
         }
@@ -44,7 +44,7 @@ Method ProfileTarget(baseName As %String) As %String
             baseName)
         While rs.%Next() {
             Set name = rs.%GetData(1), type = $ZConvert(rs.%GetData(2), "L")
-            If '##class(ETLWizard.Tools.Util).ValidIdent(name) {
+            If '##class(DataIntegrator.Tools.Util).ValidIdent(name) {
                 Continue
             }
             // etl_created_at / etl_updated_at are bookkeeping, never filtered on
@@ -55,9 +55,9 @@ Method ProfileTarget(baseName As %String) As %String
             If rows > ..#SAMPLEOVER {
                 Set from = "(SELECT TOP " _ ..#SAMPLEROWS _ " " _ name _ " FROM " _ table _ ") s"
             }
-            Set distinct = +##class(ETLWizard.Tools.Util).ScalarQuery(
+            Set distinct = +##class(DataIntegrator.Tools.Util).ScalarQuery(
                 "SELECT COUNT(DISTINCT " _ name _ ") FROM " _ from)
-            Set nulls = +##class(ETLWizard.Tools.Util).ScalarQuery(
+            Set nulls = +##class(DataIntegrator.Tools.Util).ScalarQuery(
                 "SELECT COUNT(*) FROM " _ table _ " WHERE " _ name _ " IS NULL")
             Do cols.%Push({"column": (name), "type": (type), "distinct": (distinct),
                            "nulls": (nulls), "sampled": ($Select(rows > ..#SAMPLEOVER: 1, 1: 0))})
@@ -144,9 +144,9 @@ ClassMethod RuleDraft(profile As %DynamicObject, pkColumns As %String, watermark
 ClassMethod AgentDraft(profile As %DynamicObject, draft As %DynamicArray, pkColumns As %String, watermarkColumn As %String) As %DynamicArray [ Internal ]
 {
     Try {
-        Set sc = ##class(ETLWizard.Agent.ProviderFactory).GetProviderForConfig("ETLWizardSqlGen", .provider, .model)
+        Set sc = ##class(DataIntegrator.Agent.ProviderFactory).GetProviderForConfig("DataIntegratorSqlGen", .provider, .model)
         If $$$ISERR(sc) {
-            Set sc = ##class(ETLWizard.Agent.ProviderFactory).GetProviderForConfig("ETLWizard", .provider, .model)
+            Set sc = ##class(DataIntegrator.Agent.ProviderFactory).GetProviderForConfig("DataIntegrator", .provider, .model)
         }
         If $$$ISERR(sc) {
             Return ""
@@ -267,7 +267,7 @@ Method RecommendIndexes(runId As %String, baseName As %String, pkColumns As %Str
             If (col = "") || (known '[ ("," _ $ZConvert(col, "L") _ ",")) {
                 Continue
             }
-            If '##class(ETLWizard.Tools.Util).ValidIdent(col) {
+            If '##class(DataIntegrator.Tools.Util).ValidIdent(col) {
                 Continue
             }
             If $ListFind($ListBuild("standard", "bitmap", "bitslice", "columnar"), type) = 0 {
@@ -327,7 +327,7 @@ ClassMethod IndexName(baseName As %String, column As %String, type As %String) A
 Method CreateIndexes(runId As %String, baseName As %String, specJson As %String) As %String
 {
     Try {
-        If '##class(ETLWizard.Tools.Util).ValidIdent(baseName) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(baseName) {
             Return "ERROR: invalid baseName"
         }
         Set table = "ETLW_TARGET." _ baseName
@@ -336,13 +336,13 @@ Method CreateIndexes(runId As %String, baseName As %String, specJson As %String)
         Set toColumnar = +spec.%Get("tableColumnar", 0)
         If toColumnar {
             Set ddl = "ALTER TABLE " _ table _ " CONVERT TO STORAGETYPE = COLUMNAR"
-            Set err = ##class(ETLWizard.Tools.Util).RunDDL(ddl)
+            Set err = ##class(DataIntegrator.Tools.Util).RunDDL(ddl)
             If err '= "" {
                 Do failed.%Push({"name": (table), "type": "table_columnar", "error": (err)})
                 Set toColumnar = 0
             } Else {
                 Do applied.%Push({"name": (table), "type": "table_columnar", "ddl": (ddl)})
-                Do ##class(ETLWizard.Model.Event).Append(runId, "index.created", "",
+                Do ##class(DataIntegrator.Model.Event).Append(runId, "index.created", "",
                     {"table": (table), "type": "table_columnar", "ddl": (ddl)})
             }
         }
@@ -356,7 +356,7 @@ Method CreateIndexes(runId As %String, baseName As %String, specJson As %String)
                 If name = "" {
                     Set name = ..IndexName(baseName, col, type)
                 }
-                If '##class(ETLWizard.Tools.Util).ValidIdent(name) {
+                If '##class(DataIntegrator.Tools.Util).ValidIdent(name) {
                     Do failed.%Push({"name": (name), "error": "invalid index name"})
                     Continue
                 }
@@ -364,7 +364,7 @@ Method CreateIndexes(runId As %String, baseName As %String, specJson As %String)
                 Set colsOk = 1, colSql = ""
                 For p = 1:1:$Length(col, ",") {
                     Set one = $ZStrip($Piece(col, ",", p), "<>W")
-                    If '##class(ETLWizard.Tools.Util).ValidIdent(one) {
+                    If '##class(DataIntegrator.Tools.Util).ValidIdent(one) {
                         Set colsOk = 0
                         Quit
                     }
@@ -385,13 +385,13 @@ Method CreateIndexes(runId As %String, baseName As %String, specJson As %String)
                 Set keyword = $Case(type, "bitmap": "BITMAP ", "bitslice": "BITSLICE ",
                     "columnar": "COLUMNAR ", "unique": "UNIQUE ", : "")
                 Set ddl = "CREATE " _ keyword _ "INDEX " _ name _ " ON " _ table _ " (" _ colSql _ ")"
-                Set err = ##class(ETLWizard.Tools.Util).RunDDL(ddl)
+                Set err = ##class(DataIntegrator.Tools.Util).RunDDL(ddl)
                 If err '= "" {
                     Do failed.%Push({"name": (name), "type": (type), "error": (err)})
                     Continue
                 }
                 Do applied.%Push({"name": (name), "type": (type), "column": (col), "ddl": (ddl)})
-                Do ##class(ETLWizard.Model.Event).Append(runId, "index.created", "",
+                Do ##class(DataIntegrator.Model.Event).Append(runId, "index.created", "",
                     {"table": (table), "name": (name), "type": (type), "column": (col), "ddl": (ddl)})
             }
         }
@@ -400,7 +400,7 @@ Method CreateIndexes(runId As %String, baseName As %String, specJson As %String)
         // maintains the indexes as it inserts.
         Set built = ""
         If applied.%Size() > 0 {
-            Set rows = +##class(ETLWizard.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ table)
+            Set rows = +##class(DataIntegrator.Tools.Util).ScalarQuery("SELECT COUNT(*) FROM " _ table)
             Set built = $Select(rows > 0: ..BuildIndices(baseName),
                                 1: "empty table - the load will maintain these indexes as it inserts")
         }
@@ -417,7 +417,7 @@ Method CreateIndexes(runId As %String, baseName As %String, specJson As %String)
 ClassMethod BuildIndices(baseName As %String) As %String [ Internal ]
 {
     Try {
-        Set cls = ##class(ETLWizard.Tools.Util).ScalarQuery(
+        Set cls = ##class(DataIntegrator.Tools.Util).ScalarQuery(
             "SELECT CLASSNAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'ETLW_TARGET' AND TABLE_NAME = ?",
             baseName)
         If ($Extract(cls, 1, 5) = "ERROR") || (cls = "") {
@@ -445,7 +445,7 @@ ClassMethod BuildIndices(baseName As %String) As %String [ Internal ]
 ClassMethod RecordOnPipeline(runId As %String, applied As %DynamicArray, tableColumnar As %Boolean) As %String [ Internal ]
 {
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return ""
         }
@@ -469,19 +469,19 @@ ClassMethod RecordOnPipeline(runId As %String, applied As %DynamicArray, tableCo
 /// already there instead of proposing it again.
 Method ListTargetIndexes(baseName As %String) As %String
 {
-    If '##class(ETLWizard.Tools.Util).ValidIdent(baseName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(baseName) {
         Return "ERROR: invalid baseName"
     }
     // two steps rather than a join: the table's class name first, then its
     // indexes. IDKEY and %%DDLBEIndex are IRIS's own bookkeeping, not something
     // the user chose, so they are not worth showing.
-    Set cls = ##class(ETLWizard.Tools.Util).ScalarQuery(
+    Set cls = ##class(DataIntegrator.Tools.Util).ScalarQuery(
         "SELECT CLASSNAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'ETLW_TARGET' AND TABLE_NAME = ?",
         baseName)
     If ($Extract(cls, 1, 5) = "ERROR") || (cls = "") {
         Return "{""rows"":[],""row_count"":0}"
     }
-    Return ##class(ETLWizard.Tools.Util).RunSelect(
+    Return ##class(DataIntegrator.Tools.Util).RunSelect(
         "SELECT SqlName AS index_name, Type AS index_type, Properties AS columns " _
         "FROM %Dictionary.CompiledIndex WHERE parent = '" _ cls _ "' " _
         "AND Name NOT IN ('IDKEY', 'DDLBEIndex')", 100)

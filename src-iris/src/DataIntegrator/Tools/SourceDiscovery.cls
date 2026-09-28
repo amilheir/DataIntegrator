@@ -1,14 +1,14 @@
 /// Read-only source discovery and profiling tools (spec §10.2). All remote
 /// reads go through THROUGH passthrough queries (SELECT-only, bounded) so
 /// nothing is mounted or moved before the user approves it.
-Class ETLWizard.Tools.SourceDiscovery Extends %AI.Tool [ DependsOn = ETLWizard.Tools.Util ]
+Class DataIntegrator.Tools.SourceDiscovery Extends %AI.Tool [ DependsOn = DataIntegrator.Tools.Util ]
 {
 
 /// List the pre-defined SQL Gateway JDBC connections available for
 /// CREATE FOREIGN SERVER ... CONNECTION '<name>'.
 Method ListGatewayConnections() As %String
 {
-    Return ##class(ETLWizard.Tools.Util).RunSelect(
+    Return ##class(DataIntegrator.Tools.Util).RunSelect(
         "SELECT Connection_Name AS Name, URL, driver FROM %Library.sys_SQLConnection WHERE isJDBC = 1", 50)
 }
 
@@ -16,17 +16,17 @@ Method ListGatewayConnections() As %String
 /// THROUGH <server> SELECT 1 and reports success or the connection error.
 Method TestConnection(serverName As %String) As %String
 {
-    Set result = ##class(ETLWizard.Tools.Util).Through(serverName, "SELECT 1", 1)
+    Set result = ##class(DataIntegrator.Tools.Util).Through(serverName, "SELECT 1", 1)
     If $Extract(result, 1, 5) = "ERROR" {
         Return result
     }
-    Return "Connection OK through foreign server ETLWIZARD." _ serverName
+    Return "Connection OK through foreign server DATAINTEGRATOR." _ serverName
 }
 
 /// List schemas and tables on the remote source (via information_schema).
 Method DiscoverSchema(serverName As %String) As %String
 {
-    Return ##class(ETLWizard.Tools.Util).Through(serverName,
+    Return ##class(DataIntegrator.Tools.Util).Through(serverName,
         "SELECT table_schema, table_name FROM information_schema.tables " _
         "WHERE table_type = 'BASE TABLE' " _
         "AND table_schema NOT IN ('pg_catalog', 'information_schema') " _
@@ -36,13 +36,13 @@ Method DiscoverSchema(serverName As %String) As %String
 /// List columns, data types and nullability of one remote table.
 Method DiscoverColumns(serverName As %String, schemaName As %String, tableName As %String) As %String
 {
-    If '##class(ETLWizard.Tools.Util).ValidIdent(schemaName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(schemaName) {
         Return "ERROR: invalid schema name"
     }
-    If '##class(ETLWizard.Tools.Util).ValidIdent(tableName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(tableName) {
         Return "ERROR: invalid table name"
     }
-    Return ##class(ETLWizard.Tools.Util).Through(serverName,
+    Return ##class(DataIntegrator.Tools.Util).Through(serverName,
         "SELECT column_name, data_type, is_nullable, column_default " _
         "FROM information_schema.columns " _
         "WHERE table_schema = '" _ schemaName _ "' AND table_name = '" _ tableName _ "' " _
@@ -52,13 +52,13 @@ Method DiscoverColumns(serverName As %String, schemaName As %String, tableName A
 /// List the primary-key columns of one remote table.
 Method DiscoverPrimaryKey(serverName As %String, schemaName As %String, tableName As %String) As %String
 {
-    If '##class(ETLWizard.Tools.Util).ValidIdent(schemaName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(schemaName) {
         Return "ERROR: invalid schema name"
     }
-    If '##class(ETLWizard.Tools.Util).ValidIdent(tableName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(tableName) {
         Return "ERROR: invalid table name"
     }
-    Return ##class(ETLWizard.Tools.Util).Through(serverName,
+    Return ##class(DataIntegrator.Tools.Util).Through(serverName,
         "SELECT kcu.column_name " _
         "FROM information_schema.table_constraints tc " _
         "JOIN information_schema.key_column_usage kcu " _
@@ -73,13 +73,13 @@ Method DiscoverPrimaryKey(serverName As %String, schemaName As %String, tableNam
 /// for incremental loading, with their current MIN/MAX values.
 Method DetectWatermarks(serverName As %String, schemaName As %String, tableName As %String) As %String
 {
-    If '##class(ETLWizard.Tools.Util).ValidIdent(schemaName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(schemaName) {
         Return "ERROR: invalid schema name"
     }
-    If '##class(ETLWizard.Tools.Util).ValidIdent(tableName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(tableName) {
         Return "ERROR: invalid table name"
     }
-    Set colsJson = ##class(ETLWizard.Tools.Util).Through(serverName,
+    Set colsJson = ##class(DataIntegrator.Tools.Util).Through(serverName,
         "SELECT column_name, data_type FROM information_schema.columns " _
         "WHERE table_schema = '" _ schemaName _ "' AND table_name = '" _ tableName _ "' " _
         "AND (data_type LIKE 'timestamp%' OR data_type IN ('date', 'integer', 'bigint', 'numeric'))", 50)
@@ -92,10 +92,10 @@ Method DetectWatermarks(serverName As %String, schemaName As %String, tableName 
         Set iter = cols.rows.%GetIterator()
         While iter.%GetNext(.i, .col) {
             Set colName = col."column_name"
-            If '##class(ETLWizard.Tools.Util).ValidIdent(colName) {
+            If '##class(DataIntegrator.Tools.Util).ValidIdent(colName) {
                 Continue
             }
-            Set mm = ##class(ETLWizard.Tools.Util).Through(serverName,
+            Set mm = ##class(DataIntegrator.Tools.Util).Through(serverName,
                 "SELECT MIN(" _ colName _ ") AS min_value, MAX(" _ colName _ ") AS max_value, " _
                 "COUNT(*) AS total_rows, COUNT(" _ colName _ ") AS non_null_rows " _
                 "FROM " _ schemaName _ "." _ tableName, 1)
@@ -123,45 +123,45 @@ Method DetectWatermarks(serverName As %String, schemaName As %String, tableName 
 /// Row-count estimate for a remote table.
 Method EstimateRows(serverName As %String, schemaName As %String, tableName As %String) As %String
 {
-    If '##class(ETLWizard.Tools.Util).ValidIdent(schemaName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(schemaName) {
         Return "ERROR: invalid schema name"
     }
-    If '##class(ETLWizard.Tools.Util).ValidIdent(tableName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(tableName) {
         Return "ERROR: invalid table name"
     }
-    Return ##class(ETLWizard.Tools.Util).Through(serverName,
+    Return ##class(DataIntegrator.Tools.Util).Through(serverName,
         "SELECT COUNT(*) AS row_count FROM " _ schemaName _ "." _ tableName, 1)
 }
 
 /// Bounded sample of remote rows (maxRows capped at 20 — spec §27.4).
 Method SampleRows(serverName As %String, schemaName As %String, tableName As %String, maxRows As %Integer = 10) As %String
 {
-    If '##class(ETLWizard.Tools.Util).ValidIdent(schemaName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(schemaName) {
         Return "ERROR: invalid schema name"
     }
-    If '##class(ETLWizard.Tools.Util).ValidIdent(tableName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(tableName) {
         Return "ERROR: invalid table name"
     }
     If maxRows > 20 {
         Set maxRows = 20
     }
-    Return ##class(ETLWizard.Tools.Util).Through(serverName,
+    Return ##class(DataIntegrator.Tools.Util).Through(serverName,
         "SELECT * FROM " _ schemaName _ "." _ tableName _ " LIMIT " _ (maxRows + 0), maxRows)
 }
 
 /// Null/distinct/min/max profile of one remote column.
 Method ProfileColumn(serverName As %String, schemaName As %String, tableName As %String, columnName As %String) As %String
 {
-    If '##class(ETLWizard.Tools.Util).ValidIdent(schemaName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(schemaName) {
         Return "ERROR: invalid schema name"
     }
-    If '##class(ETLWizard.Tools.Util).ValidIdent(tableName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(tableName) {
         Return "ERROR: invalid table name"
     }
-    If '##class(ETLWizard.Tools.Util).ValidIdent(columnName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(columnName) {
         Return "ERROR: invalid column name"
     }
-    Return ##class(ETLWizard.Tools.Util).Through(serverName,
+    Return ##class(DataIntegrator.Tools.Util).Through(serverName,
         "SELECT COUNT(*) AS total_rows, COUNT(" _ columnName _ ") AS non_null_rows, " _
         "COUNT(DISTINCT " _ columnName _ ") AS distinct_values, " _
         "MIN(" _ columnName _ ") AS min_value, MAX(" _ columnName _ ") AS max_value " _
@@ -176,7 +176,7 @@ Method ProfileColumn(serverName As %String, schemaName As %String, tableName As 
 ClassMethod OdbcConnect(connection As %String, Output err As %String) As %ObjectHandle [ Internal ]
 {
     Set err = ""
-    If '##class(ETLWizard.Tools.Util).ValidIdent(connection) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(connection) {
         Set err = "ERROR: invalid connection name"
         Return ""
     }
@@ -276,7 +276,7 @@ Method DiscoverOdbcSchemas(connection As %String) As %String
 Method DiscoverOdbcTables(connection As %String, schemaName As %String = "", maxTables As %Integer = 200) As %String
 {
     Try {
-        If (schemaName '= "") && ('##class(ETLWizard.Tools.Util).ValidIdent(schemaName)) {
+        If (schemaName '= "") && ('##class(DataIntegrator.Tools.Util).ValidIdent(schemaName)) {
             Return "ERROR: invalid schema name"
         }
         Set conn = ..OdbcConnect(connection, .err)
@@ -383,11 +383,11 @@ Method DiscoverOdbcColumns(connection As %String, schemaName As %String, tableNa
     }
 }
 
-/// Bounded SELECT against a mounted foreign table (ETLWIZARD schema) to
+/// Bounded SELECT against a mounted foreign table (DATAINTEGRATOR schema) to
 /// verify it works after creation.
 Method TestForeignTable(tableName As %String, maxRows As %Integer = 5) As %String
 {
-    If '##class(ETLWizard.Tools.Util).ValidIdent(tableName) {
+    If '##class(DataIntegrator.Tools.Util).ValidIdent(tableName) {
         Return "ERROR: invalid table name"
     }
     If maxRows > 20 {
@@ -398,17 +398,17 @@ Method TestForeignTable(tableName As %String, maxRows As %Integer = 5) As %Strin
     // no TOP). RunSelect stops reading at maxRows anyway, so drop TOP for views.
     Set isView = 0
     Set chk = ##class(%SQL.Statement).%ExecDirect(,
-        "SELECT TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'ETLWIZARD' AND TABLE_NAME = ?",
+        "SELECT TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'DATAINTEGRATOR' AND TABLE_NAME = ?",
         tableName)
     If chk.%Next() {
         Set isView = ($ZConvert(chk.%GetData(1), "U") = "VIEW")
     }
     If isView {
-        Return ##class(ETLWizard.Tools.Util).RunSelect(
-            "SELECT * FROM ETLWIZARD." _ tableName, maxRows)
+        Return ##class(DataIntegrator.Tools.Util).RunSelect(
+            "SELECT * FROM DATAINTEGRATOR." _ tableName, maxRows)
     }
-    Return ##class(ETLWizard.Tools.Util).RunSelect(
-        "SELECT TOP " _ (maxRows + 0) _ " * FROM ETLWIZARD." _ tableName, maxRows)
+    Return ##class(DataIntegrator.Tools.Util).RunSelect(
+        "SELECT TOP " _ (maxRows + 0) _ " * FROM DATAINTEGRATOR." _ tableName, maxRows)
 }
 
 }

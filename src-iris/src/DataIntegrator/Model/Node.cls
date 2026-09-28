@@ -1,9 +1,9 @@
 /// A node of the pipeline DAG (spec §12.1). SqlText stores the exact DDL/DML
 /// executed so the pipeline re-runs without the agent (spec §1.1, §13).
-Class ETLWizard.Model.Node Extends %Persistent
+Class DataIntegrator.Model.Node Extends %Persistent
 {
 
-Property Pipeline As ETLWizard.Model.Pipeline [ Required ];
+Property Pipeline As DataIntegrator.Model.Pipeline [ Required ];
 
 Property Kind As %String(VALUELIST = ",source,foreign_server,foreign_table,rest_client,landing,staging,transform_view,load_config,bulk_load,target,check,quarantine,host,production") [ Required ];
 

@@ -1,6 +1,6 @@
 /// Typed request carrying run context between production hosts (spec §4.3).
 /// What the Visual Trace displays for each pipeline run.
-Class ETLWizard.Msg.ExtractBatch Extends Ens.Request
+Class DataIntegrator.Msg.ExtractBatch Extends Ens.Request
 {
 
 Property PipelineId As %String [ Required ];

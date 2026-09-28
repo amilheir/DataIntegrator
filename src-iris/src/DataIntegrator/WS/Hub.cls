@@ -3,13 +3,13 @@ Include %cspInclude
 /// WebSocket event fan-out per run (spec §5, §14.1).
 /// Protocol: on connect the client sends {"runId":"...","lastSeq":0}; the hub
 /// replays persisted events with Seq > lastSeq, then switches to live push.
-/// The canvas is a pure projection of the persisted ETLWizard.Model.Event log,
+/// The canvas is a pure projection of the persisted DataIntegrator.Model.Event log,
 /// so a reconnecting client is always consistent (spec §23.3).
 ///
 /// P0 note: live push is poll-based over the event table (the persisted log IS
 /// the bus). Interprocess signalling can replace the poll later without any
 /// protocol change.
-Class ETLWizard.WS.Hub Extends %CSP.WebSocket
+Class DataIntegrator.WS.Hub Extends %CSP.WebSocket
 {
 
 /// Run this socket is subscribed to
@@ -39,7 +39,7 @@ Property Replaying As %Boolean [ InitialExpression = 1 ];
 /// client: what arrives is max(producer interval, this). It was 1s, which made
 /// any batching finer than a second pointless; 0.25s is four checks a second
 /// against one indexed query on a table the client is reading anyway.
-/// Overridable at runtime: Set ^ETLWizard.Agent("ws","tick") = 0.5
+/// Overridable at runtime: Set ^DataIntegrator.Agent("ws","tick") = 0.5
 Parameter TICKDEFAULT = 0.25;
 
 Method OnPreServer() As %Status
@@ -69,7 +69,7 @@ Method Server() As %Status
         Set ..RunId = sub.runId
         Set ..LastSeq = +sub.lastSeq
 
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(..RunId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(..RunId)
         If '$IsObject(run) {
             Do ..Write({"type":"error","error":("run not found: " _ ..RunId)}.%ToJSON())
             Do ..EndServer()
@@ -81,7 +81,7 @@ Method Server() As %Status
         // Replay + live loop: push anything newer than the cursor, then use a
         // short Read timeout as the poll tick. Client frames are optional
         // ({"type":"ack"} keep-alives are ignored).
-        Set tick = +$Get(^ETLWizard.Agent("ws", "tick"), ..#TICKDEFAULT)
+        Set tick = +$Get(^DataIntegrator.Agent("ws", "tick"), ..#TICKDEFAULT)
         If (tick <= 0) || (tick > 5) {
             Set tick = ..#TICKDEFAULT
         }
@@ -119,7 +119,7 @@ Method PushPending() As %Status
     Set sc = $$$OK
     Try {
         Set stmt = ##class(%SQL.Statement).%New()
-        Set sc = stmt.%Prepare("SELECT ID FROM ETLWizard_Model.Event WHERE Run = ? AND Seq > ? ORDER BY Seq")
+        Set sc = stmt.%Prepare("SELECT ID FROM DataIntegrator_Model.Event WHERE Run = ? AND Seq > ? ORDER BY Seq")
         If $$$ISERR(sc) {
             Return sc
         }
@@ -128,7 +128,7 @@ Method PushPending() As %Status
             Return $$$ERROR($$$GeneralError, "event query failed: SQLCODE " _ rs.%SQLCODE)
         }
         While rs.%Next() {
-            Set ev = ##class(ETLWizard.Model.Event).%OpenId(rs.ID)
+            Set ev = ##class(DataIntegrator.Model.Event).%OpenId(rs.ID)
             If '$IsObject(ev) {
                 Continue
             }

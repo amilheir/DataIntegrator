@@ -1,10 +1,10 @@
 /// Append-only event log (spec §12.1, §14.2). The real-time canvas is a pure
 /// projection of this log: the WS hub replays events with Seq > lastSeq on
 /// reconnect, then pushes live. Doubles as the audit trail (spec §16.6).
-Class ETLWizard.Model.Event Extends %Persistent
+Class DataIntegrator.Model.Event Extends %Persistent
 {
 
-Property Run As ETLWizard.Model.Run [ Required ];
+Property Run As DataIntegrator.Model.Run [ Required ];
 
 /// Monotonic per-run sequence — the replay cursor
 Property Seq As %Integer [ Required ];
@@ -37,13 +37,13 @@ ClassMethod Append(runId As %String, type As %String, nodeRef As %String = "", p
     Set sc = $$$OK
     Set seq = 0
     Try {
-        Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+        Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
         If '$IsObject(run) {
             Return $$$ERROR($$$GeneralError, "Run not found: " _ runId)
         }
         Set ev = ..%New()
         Set ev.Run = run
-        Set ev.Seq = $Increment(^ETLWizard.EventSeq(runId))
+        Set ev.Seq = $Increment(^DataIntegrator.EventSeq(runId))
         Set ev.Ts = $ZDateTime($ZTimeStamp, 3, , 3)
         Set ev.Type = type
         Set ev.NodeRef = nodeRef

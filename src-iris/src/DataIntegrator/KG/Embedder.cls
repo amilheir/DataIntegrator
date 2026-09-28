@@ -8,7 +8,7 @@ Include %occStatus
 /// on this instance, that is ~247 ms; the same text in a batch of 32 costs
 /// ~31 ms per row. Eight times faster is the difference between a demo and a
 /// coffee break, so the vectors are written explicitly.
-Class ETLWizard.KG.Embedder Extends %RegisteredObject
+Class DataIntegrator.KG.Embedder Extends %RegisteredObject
 {
 
 /// Batch size beyond which the request body gets unwieldy. 32 measured fastest
@@ -32,7 +32,7 @@ ClassMethod Embed(texts As %DynamicArray, Output vectors As %DynamicArray) As %S
         If texts.%Size() > ..#MAXBATCH {
             Return "batch of " _ texts.%Size() _ " exceeds the maximum of " _ ..#MAXBATCH
         }
-        Set err = ##class(ETLWizard.KG.Setup).EmbedEndpoint(.baseUrl, .model)
+        Set err = ##class(DataIntegrator.KG.Setup).EmbedEndpoint(.baseUrl, .model)
         If err '= "" {
             Return err
         }
@@ -67,7 +67,7 @@ ClassMethod Embed(texts As %DynamicArray, Output vectors As %DynamicArray) As %S
             Return "asked for " _ texts.%Size() _ " embeddings and got " _ data.%Size() _
                 " - refusing to guess which text each belongs to"
         }
-        Set dims = ##class(ETLWizard.KG.Setup).#EMBEDDIMS
+        Set dims = ##class(DataIntegrator.KG.Setup).#EMBEDDIMS
         Set iter = data.%GetIterator()
         While iter.%GetNext(, .entry) {
             Set arr = entry.%Get("embedding")
@@ -131,15 +131,15 @@ ClassMethod SelfTest() As %DynamicObject
         Set elapsed = $ZHorolog - start
 
         // cosine computed by IRIS itself, the same way a search will
-        Set related = ##class(ETLWizard.Tools.Util).ScalarQuery(
+        Set related = ##class(DataIntegrator.Tools.Util).ScalarQuery(
             "SELECT VECTOR_COSINE(TO_VECTOR(?, FLOAT, 1024), TO_VECTOR(?, FLOAT, 1024))",
             vectors.%Get(0), vectors.%Get(1))
-        Set unrelated = ##class(ETLWizard.Tools.Util).ScalarQuery(
+        Set unrelated = ##class(DataIntegrator.Tools.Util).ScalarQuery(
             "SELECT VECTOR_COSINE(TO_VECTOR(?, FLOAT, 1024), TO_VECTOR(?, FLOAT, 1024))",
             vectors.%Get(0), vectors.%Get(2))
         Return {"ok": (''((+related > +unrelated) && (+related > 0.5))),
                 "relatedScore": (+related), "unrelatedScore": (+unrelated),
-                "seconds": (##class(ETLWizard.KG.Setup).Round(elapsed, 3)), "batch": (texts.%Size())}
+                "seconds": (##class(DataIntegrator.KG.Setup).Round(elapsed, 3)), "batch": (texts.%Size())}
     } Catch ex {
         Return {"error": (ex.DisplayString())}
     }

@@ -9,7 +9,7 @@
 /// twice - so this sink writes the answer CUMULATIVELY into `Ask.answerSoFar`.
 /// Whatever a poll happens to catch is the whole answer so far, and a missed
 /// poll costs nothing. One UPDATE of one row, not a row per token.
-Class ETLWizard.KG.AskSink Extends ETLWizard.Agent.StreamSink
+Class DataIntegrator.KG.AskSink Extends DataIntegrator.Agent.StreamSink
 {
 
 Property AskId As %String;
@@ -24,7 +24,7 @@ Method StartAsk(askId As %String, minChars As %Integer = 24, minMs As %Integer =
 /// polling client needs.
 Method Emit(text As %String)
 {
-    Do ##class(ETLWizard.Tools.Util).RunDML(
+    Do ##class(DataIntegrator.Tools.Util).RunDML(
         "UPDATE ETLW_KG.Ask SET answerSoFar = ?, updatedAt = ? WHERE %ID = ?",
         $Extract(..Text, 1, 30000), $ZDateTime($Horolog, 3), ..AskId)
 }

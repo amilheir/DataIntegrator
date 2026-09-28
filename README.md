@@ -12,7 +12,7 @@ strategy scoring are **deterministic**: `Tools.SourceDiscovery` reads JDBC/ODBC 
 and infers CSV types, and `Tools.Strategy` scores the options by rule — the model only
 narrates them. The **LLM** writes the transformation SQL and suggests merge keys
 (`Agent.SqlGen`), recommends indexes, proposes MCP tools, and does the entity extraction
-and chat in the Knowledge Base. Separately, `ETLWizard.Agent.Architect` is a full
+and chat in the Knowledge Base. Separately, `DataIntegrator.Agent.Architect` is a full
 `%AI.Agent` carrying the 12-step wizard prompt and a composed toolset over all of the
 above; it drives the same tools the UI does and is reachable at
 `POST /runs/:runId/message`, though the five tabs call those tools directly rather than
@@ -22,8 +22,8 @@ What the pipeline produces does not stop at a table. The same UI publishes those
 MCP clients as tools, and embeds their free text into vectors and a knowledge graph that
 can be asked questions — all inside this one instance, with nothing copied anywhere.
 
-The product is called **Data Integration**; the code package is `ETLWizard`, and the
-namespace is `ETLWIZARD`.
+The product is called **Data Integration**; the code package is `DataIntegrator`, and the
+namespace is `DATAINTEGRATOR`.
 
 ```bash
 sh scripts/demo-verify.sh    # READY, or exactly what is wrong
@@ -35,21 +35,21 @@ sh scripts/stop.sh           # the ONLY supported way to stop the stack
 
 ```
 docker-compose.yaml        IRIS (AI Hub EAP image) + webgateway + postgres + ollama
-Modelfile.ornith           etlwizard-ornith  \
-Modelfile.gemma            etlwizard-gemma    > the three masthead picker models
-Modelfile.coder            etlwizard-coder   /  (all 8192-context, spec §27.3)
-Modelfile                  etlwizard-qwen (9B; needs >8 GB VRAM — see Modelfile.coder)
+Modelfile.ornith           dataintegrator-ornith  \
+Modelfile.gemma            dataintegrator-gemma    > the three masthead picker models
+Modelfile.coder            dataintegrator-coder   /  (all 8192-context, spec §27.3)
+Modelfile                  dataintegrator-qwen (9B; needs >8 GB VRAM — see Modelfile.coder)
 mds/                       the specs and the per-tab build plans, each with its
                            measured results and the bugs found building it
 src-iris/
-  Dockerfile               build: load + compile ETLWizard into ETLWIZARD namespace
+  Dockerfile               build: load + compile DataIntegrator into DATAINTEGRATOR namespace
   iris.script              namespace setup + build-161+ compile ordering
-  Installer.cls            ETLWIZARD namespace, /etlwizard + /etlwizard/api web apps
+  Installer.cls            DATAINTEGRATOR namespace, /dataintegrator + /dataintegrator/api web apps
   config.toml              iris-mcp-server sidecar: the MCP endpoints it serves
   cpf/cpfmerge.cpf         CPF merge (CallIn service)
   frontend/index.html      the whole UI: one self-contained file, no build step
   dropzone/                CSV source files the wizard can mount or bulk load
-  src/ETLWizard/
+  src/DataIntegrator/
     Model/                 Pipeline · Node · Edge · Run · Event · Watermark ·
                            Production · PendingApproval
     Msg/                   ExtractBatch · LoadResult (interoperability messages)
@@ -83,7 +83,7 @@ scripts/
 
 | Tab | What it does |
 |---|---|
-| **Data Sources** | Standing configuration: gateway connections, foreign servers, and the tables mounted from them. Also bulk-loads a CSV/XLSX once into an `ETLWIZARD.ext_*` table — no production, no schedule. Global — not tied to any one pipeline. |
+| **Data Sources** | Standing configuration: gateway connections, foreign servers, and the tables mounted from them. Also bulk-loads a CSV/XLSX once into an `DATAINTEGRATOR.ext_*` table — no production, no schedule. Global — not tied to any one pipeline. |
 | **ETL Interop** | Builds one ETL at a time from tables that already exist: pick tables → generate/edit the SQL → choose strategy, watermark and schedule → deploy, load, and optionally index. Owns the live flowchart and the results panel, which reports the whole integration time from the Extract's `TimeCreated` to the Load's `TimeProcessed`. |
 | **ML Models** | IntegratedML workbench over any mounted table: create, train, validate, inspect metrics, predict. |
 | **AI Tools** | Proposes one tool per question a target table can answer, lets you edit and try them, and publishes the ones you keep as an `%AI.ToolSet` on `/mcp/irisaihub` — reachable from Claude and any other MCP client. Nothing is exposed until you publish. |
@@ -91,7 +91,7 @@ scripts/
 
 A masthead toggle switches between **Technical** and **Executive** views of the same
 application — same instance, same capabilities, different audience. Set the instance
-default with `do ##class(ETLWizard.Setup).SetDefaultView("executive")`.
+default with `do ##class(DataIntegrator.Setup).SetDefaultView("executive")`.
 
 ## The Knowledge Base, in one paragraph
 
@@ -119,9 +119,9 @@ model stays resident and exactly one generation model sits beside it at a time:
 | Model | Role |
 |---|---|
 | `leoipulsar/harrier-0.6b` | embeddings — 1024 dimensions, ~31 ms/row at batch 32 |
-| `etlwizard-coder` | SQL generation, and entity/relationship extraction (measured ~5× faster than gemma at that job) |
-| `etlwizard-gemma` | the conversational answer in the chat pane |
-| `etlwizard-ornith` | the third masthead picker option |
+| `dataintegrator-coder` | SQL generation, and entity/relationship extraction (measured ~5× faster than gemma at that job) |
+| `dataintegrator-gemma` | the conversational answer in the chat pane |
+| `dataintegrator-ornith` | the third masthead picker option |
 
 The masthead picker reports each model's **real** resident size read from `/api/ps`, not
 the download size — the two differ by enough to matter on an 8 GB card.

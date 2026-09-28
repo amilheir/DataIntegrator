@@ -5,13 +5,13 @@
 #      fresh clone lacks them) - they are never fetched, only reported
 #   2. the gateway connection, both foreign servers and the demo mounts - but
 #      only on a fresh iris-data volume; an existing one keeps what it has
-#   3. /tmp/etlwizard-ready, which the compose healthcheck waits for
+#   3. /tmp/dataintegrator-ready, which the compose healthcheck waits for
 #
 # The seeding runs in the background and this script always exits 0: iris-main
 # must not block on it or treat a slow Postgres as a failed start.
 
 LOG=/opt/irisbuild/data/startup.log
-NS=ETLWIZARD
+NS=DATAINTEGRATOR
 
 # Required external files: path, then what breaks without it.
 REQUIRED="
@@ -26,7 +26,7 @@ echo "$REQUIRED" | while IFS='|' read -r f why; do
 done
 
 seed() {
-    rm -f /tmp/etlwizard-ready
+    rm -f /tmp/dataintegrator-ready
     echo "== $(date -Is) startup seeding"
 
     # Postgres runs its init scripts before it accepts TCP, so a reachable port
@@ -36,19 +36,19 @@ seed() {
         sleep 2
     done
 
-    MOUNTED=$(printf 'write "MOUNTED=",$SYSTEM.SQL.Schema.TableExists("ETLWIZARD.ext_customer"),!\nhalt\n' \
+    MOUNTED=$(printf 'write "MOUNTED=",$SYSTEM.SQL.Schema.TableExists("DATAINTEGRATOR.ext_customer"),!\nhalt\n' \
         | iris session IRIS -U "$NS" | tr -d '\r' | sed -n 's/^MOUNTED=//p')
     if [ "$MOUNTED" = "1" ]; then
         echo "demo tables already mounted - leaving the volume as it is"
     else
         # Two sessions on purpose: a foreign server created in one process is
         # not visible to the schema importer in that same process (SQLCODE -237).
-        # See ETLWizard.Setup.PrepareServers().
-        printf 'do ##class(ETLWizard.Setup).PrepareServers()\nhalt\n' | iris session IRIS -U "$NS"
-        printf 'do ##class(ETLWizard.Setup).MountDemoTables()\nhalt\n' | iris session IRIS -U "$NS"
+        # See DataIntegrator.Setup.PrepareServers().
+        printf 'do ##class(DataIntegrator.Setup).PrepareServers()\nhalt\n' | iris session IRIS -U "$NS"
+        printf 'do ##class(DataIntegrator.Setup).MountDemoTables()\nhalt\n' | iris session IRIS -U "$NS"
     fi
 
-    touch /tmp/etlwizard-ready
+    touch /tmp/dataintegrator-ready
     echo "== $(date -Is) ready"
 }
 

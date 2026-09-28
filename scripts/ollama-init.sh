@@ -29,12 +29,12 @@ build() {   # build <picker model> <Modelfile>
 }
 
 RC=0
-# Order: ETLWizard.Setup DEFAULTAGENTMODEL first, then the rest of the picker.
-build etlwizard-gemma  Modelfile.gemma  || RC=1
-build etlwizard-coder  Modelfile.coder  || RC=1
-build etlwizard-ornith Modelfile.ornith || RC=1
+# Order: DataIntegrator.Setup DEFAULTAGENTMODEL first, then the rest of the picker.
+build dataintegrator-gemma  Modelfile.gemma  || RC=1
+build dataintegrator-coder  Modelfile.coder  || RC=1
+build dataintegrator-ornith Modelfile.ornith || RC=1
 
-# ETLWizard.KG.Setup EMBEDMODEL
+# DataIntegrator.KG.Setup EMBEDMODEL
 EMBED="${EMBEDDING_MODEL:-leoipulsar/harrier-0.6b:latest}"
 have "$EMBED" && echo "$EMBED present" || ollama pull "$EMBED" || RC=1
 

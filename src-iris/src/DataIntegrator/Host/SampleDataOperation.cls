@@ -11,7 +11,7 @@
 ///
 /// Insert order is forced by the foreign keys: employee, then customers (which
 /// reference an employee), then orders (which reference both).
-Class ETLWizard.Host.SampleDataOperation Extends Ens.BusinessOperation
+Class DataIntegrator.Host.SampleDataOperation Extends Ens.BusinessOperation
 {
 
 Parameter ADAPTER = "Ens.OutboundAdapter";

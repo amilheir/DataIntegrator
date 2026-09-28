@@ -3,13 +3,13 @@
 /// Deliberately does NOT use the full architect agent: a focused, TOOL-FREE
 /// single-purpose LLM call is far faster and much more reliable on a small
 /// local model than a 40-tool agent loop. It uses the SAME provider/model
-/// resolved from the Config Store (AI.LLM.ETLWizard), so it follows whichever
+/// resolved from the Config Store (AI.LLM.DataIntegrator), so it follows whichever
 /// profile is active (local Ollama or cloud).
 ///
 /// The generated SQL is always validated by PREPARING it before it is handed
 /// back, so the UI can tell the user whether it actually compiles and what
 /// columns it produces — the user then refines with another prompt.
-Class ETLWizard.Agent.SqlGen Extends %RegisteredObject
+Class DataIntegrator.Agent.SqlGen Extends %RegisteredObject
 {
 
 /// Max tables described to the model (small models degrade with long prompts,
@@ -25,10 +25,10 @@ Parameter MAXCOLS = 15;
 Parameter MAXREPAIR = 2;
 
 /// Build a compact schema description of the foreign tables available to join.
-/// The pipeline's own mounted tables come first, then any other ETLWIZARD
+/// The pipeline's own mounted tables come first, then any other DATAINTEGRATOR
 /// foreign tables (they are all joinable).
 /// tables: optional comma-separated list the user explicitly chose for this
-/// ETL (with or without the ETLWIZARD. prefix). When supplied, ONLY those are
+/// ETL (with or without the DATAINTEGRATOR. prefix). When supplied, ONLY those are
 /// described — the sharpest possible context, which materially improves the
 /// generated SQL on small models.
 ClassMethod SchemaContext(runId As %String = "", tables As %String = "") As %String
@@ -40,7 +40,7 @@ ClassMethod SchemaContext(runId As %String = "", tables As %String = "") As %Str
         If $ZStrip(tables, "<>W") '= "" {
             For i = 1:1:$Length(tables, ",") {
                 Set t = $ZStrip($Piece(tables, ",", i), "<>W")
-                Set t = $Piece(t, ".", *)          // accept ETLWIZARD.x or x
+                Set t = $Piece(t, ".", *)          // accept DATAINTEGRATOR.x or x
                 If t = "" {
                     Continue
                 }
@@ -48,7 +48,7 @@ ClassMethod SchemaContext(runId As %String = "", tables As %String = "") As %Str
                 If cols = "" {
                     Continue
                 }
-                Set ctx = ctx _ "ETLWIZARD." _ t _ "(" _ cols _ ")" _ $Char(10)
+                Set ctx = ctx _ "DATAINTEGRATOR." _ t _ "(" _ cols _ ")" _ $Char(10)
             }
             If ctx '= "" {
                 Return ctx
@@ -57,10 +57,10 @@ ClassMethod SchemaContext(runId As %String = "", tables As %String = "") As %Str
         // pipeline's own mounted tables first
         Set own = ""
         If runId '= "" {
-            Set run = ##class(ETLWizard.Model.Run).%OpenId(runId)
+            Set run = ##class(DataIntegrator.Model.Run).%OpenId(runId)
             If $IsObject(run) {
                 Set stmt = ##class(%SQL.Statement).%New()
-                If $$$ISOK(stmt.%Prepare("SELECT Name FROM ETLWizard_Model.Node WHERE Pipeline = ? AND Kind = 'foreign_table' ORDER BY ID")) {
+                If $$$ISOK(stmt.%Prepare("SELECT Name FROM DataIntegrator_Model.Node WHERE Pipeline = ? AND Kind = 'foreign_table' ORDER BY ID")) {
                     Set rs = stmt.%Execute(run.Pipeline.%Id())
                     While rs.%Next() {
                         Set n = $Piece(rs.%GetData(1), ".", *)
@@ -71,10 +71,10 @@ ClassMethod SchemaContext(runId As %String = "", tables As %String = "") As %Str
                 }
             }
         }
-        // every table in the ETLWIZARD schema is joinable
+        // every table in the DATAINTEGRATOR schema is joinable
         Set all = ""
         Set stmt2 = ##class(%SQL.Statement).%New()
-        If $$$ISOK(stmt2.%Prepare("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'ETLWIZARD' ORDER BY TABLE_NAME")) {
+        If $$$ISOK(stmt2.%Prepare("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'DATAINTEGRATOR' ORDER BY TABLE_NAME")) {
             Set rs2 = stmt2.%Execute()
             While rs2.%Next() {
                 Set all = all _ $ListBuild(rs2.%GetData(1))
@@ -97,7 +97,7 @@ ClassMethod SchemaContext(runId As %String = "", tables As %String = "") As %Str
             If cols = "" {
                 Continue
             }
-            Set ctx = ctx _ "ETLWIZARD." _ tbl _ "(" _ cols _ ")" _ $Char(10)
+            Set ctx = ctx _ "DATAINTEGRATOR." _ tbl _ "(" _ cols _ ")" _ $Char(10)
             Set count = count + 1
         }
     } Catch {
@@ -105,13 +105,13 @@ ClassMethod SchemaContext(runId As %String = "", tables As %String = "") As %Str
     Return ctx
 }
 
-/// Column names of one ETLWIZARD table as a $List.
+/// Column names of one DATAINTEGRATOR table as a $List.
 ClassMethod ColumnNames(table As %String) As %List [ Internal ]
 {
     Set out = ""
     Try {
         Set stmt = ##class(%SQL.Statement).%New()
-        If '$$$ISOK(stmt.%Prepare("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'ETLWIZARD' AND TABLE_NAME = ?")) {
+        If '$$$ISOK(stmt.%Prepare("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'DATAINTEGRATOR' AND TABLE_NAME = ?")) {
             Return ""
         }
         Set rs = stmt.%Execute(table)
@@ -126,7 +126,7 @@ ClassMethod ColumnNames(table As %String) As %List [ Internal ]
 /// Join hints for the {joins} placeholder: for every column shared by more than
 /// one of the selected tables, emit an UNDIRECTED qualified equality, one per
 /// line, so the model has the join key without having to guess it:
-///   ETLWIZARD.ext_customer.customer_id = ETLWIZARD.ext_orders.customer_id
+///   DATAINTEGRATOR.ext_customer.customer_id = DATAINTEGRATOR.ext_orders.customer_id
 /// Foreign tables carry no PK/FK metadata, so no direction is implied. When a
 /// column is shared by 3+ tables, consecutive tables are chained (t1=t2, t2=t3),
 /// which is enough for the model to join transitively. Returns "" if the tables
@@ -189,8 +189,8 @@ ClassMethod JoinPairs(tables As %String) As %String [ Internal ]
                 If $Data(has(k, key)) {
                     If prev '= 0 {
                         Set out = out _ $Select(out = "": "", 1: $Char(10)) _
-                            "ETLWIZARD." _ tbl(prev) _ "." _ has(prev, key) _ " = " _
-                            "ETLWIZARD." _ tbl(k) _ "." _ has(k, key)
+                            "DATAINTEGRATOR." _ tbl(prev) _ "." _ has(prev, key) _ " = " _
+                            "DATAINTEGRATOR." _ tbl(k) _ "." _ has(k, key)
                     }
                     Set prev = k
                 }
@@ -201,7 +201,7 @@ ClassMethod JoinPairs(tables As %String) As %String [ Internal ]
     Return out
 }
 
-/// "col TYPE, col TYPE" for one ETLWIZARD table (bounded).
+/// "col TYPE, col TYPE" for one DATAINTEGRATOR table (bounded).
 /// The distinct values of a low-cardinality text column, as " in (a|b|c)".
 ///
 /// Without this the model is told a column is called `status` and nothing more,
@@ -222,7 +222,7 @@ ClassMethod EnumOf(table As %String, column As %String, type As %String) As %Str
         If '$ListFind($ListBuild("varchar", "character varying", "char", "nvarchar"), $ZConvert(type, "L")) {
             Return ""
         }
-        If '##class(ETLWizard.Tools.Util).ValidIdent(column) {
+        If '##class(DataIntegrator.Tools.Util).ValidIdent(column) {
             Return ""
         }
         // No TOP, and no derived table: over a FOREIGN table both
@@ -232,7 +232,7 @@ ClassMethod EnumOf(table As %String, column As %String, type As %String) As %Str
         // Measured. The cap is applied while reading instead, which also stops
         // a high-cardinality column early rather than materialising it.
         Set rs = ##class(%SQL.Statement).%ExecDirect(,
-            "SELECT DISTINCT " _ column _ " FROM ETLWIZARD." _ table _
+            "SELECT DISTINCT " _ column _ " FROM DATAINTEGRATOR." _ table _
             " WHERE " _ column _ " IS NOT NULL")
         If '$IsObject(rs) {
             Return ""
@@ -266,7 +266,7 @@ ClassMethod ColumnsOf(table As %String) As %String [ Internal ]
     Set out = ""
     Try {
         Set stmt = ##class(%SQL.Statement).%New()
-        If '$$$ISOK(stmt.%Prepare("SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'ETLWIZARD' AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION")) {
+        If '$$$ISOK(stmt.%Prepare("SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'DATAINTEGRATOR' AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION")) {
             Return ""
         }
         Set rs = stmt.%Execute(table)
@@ -300,17 +300,17 @@ ClassMethod Generate(runId As %String, instruction As %String, currentSql As %St
         }
 
         // SQL generation gets its OWN profile when one exists
-        // (AI.LLM.ETLWizardSqlGen), falling back to the architect's profile.
+        // (AI.LLM.DataIntegratorSqlGen), falling back to the architect's profile.
         // Reason: a big reasoning model is a poor fit here — it spends minutes
         // in a hidden <think> channel. A small code model answers in seconds.
         // Switching is a Config Store change, no code change:
-        //   do ##class(ETLWizard.Setup).ConfigureSqlGenProfile("qwen2.5-coder:1.5b")
-        Set sc = ##class(ETLWizard.Agent.ProviderFactory).GetProviderForConfig("ETLWizardSqlGen", .provider, .model)
+        //   do ##class(DataIntegrator.Setup).ConfigureSqlGenProfile("qwen2.5-coder:1.5b")
+        Set sc = ##class(DataIntegrator.Agent.ProviderFactory).GetProviderForConfig("DataIntegratorSqlGen", .provider, .model)
         If $$$ISERR(sc) {
-            Set sc = ##class(ETLWizard.Agent.ProviderFactory).GetProviderForConfig("ETLWizard", .provider, .model)
+            Set sc = ##class(DataIntegrator.Agent.ProviderFactory).GetProviderForConfig("DataIntegrator", .provider, .model)
         }
         If $$$ISERR(sc) {
-            Return "ERROR: LLM profile not configured (AI.LLM.ETLWizard): " _ $System.Status.GetErrorText(sc)
+            Return "ERROR: LLM profile not configured (AI.LLM.DataIntegrator): " _ $System.Status.GetErrorText(sc)
         }
         Set agent = ##class(%AI.Agent).%New(provider)
         If model '= "" {
@@ -334,7 +334,7 @@ ClassMethod Generate(runId As %String, instruction As %String, currentSql As %St
             "Joins:" _ nl _ joins _ nl _ nl _
             "Rules:" _ nl _
             "- Allowed clauses: SELECT, FROM, JOIN, WHERE, GROUP BY, HAVING. One statement." _ nl _
-            "- Table names include the schema: ETLWIZARD.<table_name> AS <alias>." _ nl _
+            "- Table names include the schema: DATAINTEGRATOR.<table_name> AS <alias>." _ nl _
             "- Alias every table. Qualify every column with its alias (c.customer_id," _ nl _
             "  never bare customer_id)." _ nl _
             "- Filters on raw column values go in WHERE." _ nl _
@@ -354,8 +354,8 @@ ClassMethod Generate(runId As %String, instruction As %String, currentSql As %St
             "- ""also add"" means add to what is there." _ nl _ nl _
             "Example shape:" _ nl _
             "SELECT c.customer_id, c.name, SUM(o.amount) AS total_spent" _ nl _
-            "FROM ETLWIZARD.ext_customer AS c" _ nl _
-            "JOIN ETLWIZARD.ext_orders AS o ON c.customer_id = o.customer_id" _ nl _
+            "FROM DATAINTEGRATOR.ext_customer AS c" _ nl _
+            "JOIN DATAINTEGRATOR.ext_orders AS o ON c.customer_id = o.customer_id" _ nl _
             "WHERE o.status = 'paid'" _ nl _
             "GROUP BY c.customer_id, c.name" _ nl _
             "HAVING SUM(o.amount) > 100"
@@ -400,7 +400,7 @@ ClassMethod Generate(runId As %String, instruction As %String, currentSql As %St
             // reaches for (expr::type) BEFORE validating, so it usually never even
             // costs a repair round.
             Set candidate = ..RewriteCasts(candidate)
-            Set candidate = ##class(ETLWizard.Tools.Util).StripSqlComments(candidate)
+            Set candidate = ##class(DataIntegrator.Tools.Util).StripSqlComments(candidate)
             Set sql = candidate
             Set lastErr = ..Validate(sql, .ddlDefs, .colList)
             If lastErr = "" {
@@ -437,7 +437,7 @@ ClassMethod Validate(sql As %String, Output ddlDefs As %String, Output colList A
 {
     Set ddlDefs = "", colList = ""
     // 1) prepare + result-set metadata -> the columns the target table is built from
-    Set err = ##class(ETLWizard.Tools.Util).GetSelectColumns(sql, .ddlDefs, .colList)
+    Set err = ##class(DataIntegrator.Tools.Util).GetSelectColumns(sql, .ddlDefs, .colList)
     If err '= "" {
         Return err
     }
@@ -463,7 +463,7 @@ ClassMethod Validate(sql As %String, Output ddlDefs As %String, Output colList A
 }
 
 /// Build a repair hint from a prepare/execute error. For every "Field 'X.COL'
-/// not found" the SQL got wrong, look up which ETLWIZARD table actually lists
+/// not found" the SQL got wrong, look up which DATAINTEGRATOR table actually lists
 /// COL and say so — turning a dead-end error into a concrete fix the model can
 /// apply (the wrong-alias mistake it cannot otherwise self-correct).
 ClassMethod RepairHint(err As %String) As %String [ Internal ]
@@ -498,17 +498,17 @@ ClassMethod RepairHint(err As %String) As %String [ Internal ]
     Return hint
 }
 
-/// Which mounted ETLWIZARD tables list a column of this name (comma-separated,
+/// Which mounted DATAINTEGRATOR tables list a column of this name (comma-separated,
 /// schema-qualified), or "" if none.
 ClassMethod LocateColumn(col As %String) As %String [ Internal ]
 {
     Set out = ""
     Try {
         Set stmt = ##class(%SQL.Statement).%New()
-        If $$$ISOK(stmt.%Prepare("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'ETLWIZARD' AND UPPER(COLUMN_NAME) = ? ORDER BY TABLE_NAME")) {
+        If $$$ISOK(stmt.%Prepare("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'DATAINTEGRATOR' AND UPPER(COLUMN_NAME) = ? ORDER BY TABLE_NAME")) {
             Set rs = stmt.%Execute($ZConvert(col, "U"))
             While rs.%Next() {
-                Set out = out _ $Select(out = "": "", 1: ", ") _ "ETLWIZARD." _ rs.%GetData(1)
+                Set out = out _ $Select(out = "": "", 1: ", ") _ "DATAINTEGRATOR." _ rs.%GetData(1)
             }
         }
     } Catch {
@@ -536,7 +536,7 @@ ClassMethod SuggestKey(runId As %String, sql As %String, tables As %String = "")
             Return out.%ToJSON()
         }
         // Resolve the actual result columns (post-dedup names the load layer uses)
-        Set err = ##class(ETLWizard.Tools.Util).GetSelectColumns(sql, .ddl, .colList)
+        Set err = ##class(DataIntegrator.Tools.Util).GetSelectColumns(sql, .ddl, .colList)
         If err '= "" {
             Return out.%ToJSON()
         }
@@ -550,7 +550,7 @@ ClassMethod SuggestKey(runId As %String, sql As %String, tables As %String = "")
         }
 
         // --- Tier 1: GROUP BY grain -----------------------------------------
-        Set grp = ##class(ETLWizard.Tools.Util).GroupByColumns(sql)
+        Set grp = ##class(DataIntegrator.Tools.Util).GroupByColumns(sql)
         If grp '= "" {
             Set pk = ""
             For i = 1:1:$Length(grp, ",") {
@@ -617,9 +617,9 @@ ClassMethod SuggestKey(runId As %String, sql As %String, tables As %String = "")
 ClassMethod AskKey(colList As %String) As %String [ Internal ]
 {
     Try {
-        Set sc = ##class(ETLWizard.Agent.ProviderFactory).GetProviderForConfig("ETLWizardSqlGen", .provider, .model)
+        Set sc = ##class(DataIntegrator.Agent.ProviderFactory).GetProviderForConfig("DataIntegratorSqlGen", .provider, .model)
         If $$$ISERR(sc) {
-            Set sc = ##class(ETLWizard.Agent.ProviderFactory).GetProviderForConfig("ETLWizard", .provider, .model)
+            Set sc = ##class(DataIntegrator.Agent.ProviderFactory).GetProviderForConfig("DataIntegrator", .provider, .model)
         }
         If $$$ISERR(sc) {
             Return ""
@@ -674,20 +674,20 @@ ClassMethod AskKey(colList As %String) As %String [ Internal ]
 ClassMethod GenerateAsync(runId As %String, instruction As %String, currentSql As %String = "", tables As %String = "") As %Status
 {
     Try {
-        Do ##class(ETLWizard.Model.Event).Append(runId, "sqlgen.started", "",
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "sqlgen.started", "",
             {"instruction": (instruction)})
         Set res = ..Generate(runId, instruction, currentSql, tables)
         If $Extract(res, 1, 5) = "ERROR" {
-            Do ##class(ETLWizard.Model.Event).Append(runId, "sqlgen.result", "",
+            Do ##class(DataIntegrator.Model.Event).Append(runId, "sqlgen.result", "",
                 {"ok": 0, "error": (res), "instruction": (instruction)})
         } Else {
             Set obj = ##class(%DynamicObject).%FromJSON(res)
             Set obj.ok = 1
             Set obj.instruction = instruction
-            Do ##class(ETLWizard.Model.Event).Append(runId, "sqlgen.result", "", obj)
+            Do ##class(DataIntegrator.Model.Event).Append(runId, "sqlgen.result", "", obj)
         }
     } Catch ex {
-        Do ##class(ETLWizard.Model.Event).Append(runId, "sqlgen.result", "",
+        Do ##class(DataIntegrator.Model.Event).Append(runId, "sqlgen.result", "",
             {"ok": 0, "error": ("ERROR: " _ ex.DisplayString())})
     }
     Return $$$OK

@@ -15,7 +15,7 @@ Include %occStatus
 /// article paragraphs and the scores here bunch into 0.45-0.63 - a nonsense
 /// question scores as high as a good one, so an absolute floor would cut real
 /// answers and admit nonsense equally.
-Class ETLWizard.KG.Chat Extends %RegisteredObject
+Class DataIntegrator.KG.Chat Extends %RegisteredObject
 {
 
 /// Chunks handed to the model as context.
@@ -57,7 +57,7 @@ Parameter HEADERWAIT = 240;
 
 ClassMethod GetChatMode() As %String
 {
-    Set mode = $Get(^ETLWizard.Agent("kgchat", "mode"))
+    Set mode = $Get(^DataIntegrator.Agent("kgchat", "mode"))
     Return $Select(mode = "": ..#CHATMODEDEFAULT, 1: mode)
 }
 
@@ -67,7 +67,7 @@ ClassMethod SetChatMode(mode As %String = "direct") As %String
     If (mode '= "direct") && (mode '= "agent") {
         Return "mode must be 'direct' or 'agent'"
     }
-    Set ^ETLWizard.Agent("kgchat", "mode") = mode
+    Set ^DataIntegrator.Agent("kgchat", "mode") = mode
     Return ""
 }
 
@@ -76,13 +76,13 @@ ClassMethod SetChatMode(mode As %String = "direct") As %String
 /// "low"/"medium"/"high" restore it if an answer needs the deliberation.
 ClassMethod GetReasoningEffort() As %String
 {
-    Set v = $Get(^ETLWizard.Agent("kgchat", "reasoningEffort"))
+    Set v = $Get(^DataIntegrator.Agent("kgchat", "reasoningEffort"))
     Return $Select(v = "": "none", 1: v)
 }
 
 ClassMethod SetReasoningEffort(effort As %String = "none") As %String
 {
-    Set ^ETLWizard.Agent("kgchat", "reasoningEffort") = effort
+    Set ^DataIntegrator.Agent("kgchat", "reasoningEffort") = effort
     Return ""
 }
 
@@ -97,15 +97,15 @@ ClassMethod Ask(corpusId As %String, question As %String) As %DynamicObject
         If corpusId = "" {
             Return {"error": "pick which embedded data to ask about"}
         }
-        Set res = ##class(ETLWizard.Tools.Util).RunDML(
+        Set res = ##class(DataIntegrator.Tools.Util).RunDML(
             "INSERT INTO ETLW_KG.Ask (corpusRef, question, status, statusDetail, createdAt) " _
             "VALUES (?,?,'pending','queued',?)",
             corpusId, $Extract(question, 1, 2000), $ZDateTime($Horolog, 3))
         If $Extract(res, 1, 5) = "ERROR" {
             Return {"error": (res)}
         }
-        Set id = ##class(ETLWizard.Tools.Util).ScalarQuery("SELECT TOP 1 %ID FROM ETLW_KG.Ask ORDER BY %ID DESC")
-        Job ##class(ETLWizard.KG.Chat).Run(id)::5
+        Set id = ##class(DataIntegrator.Tools.Util).ScalarQuery("SELECT TOP 1 %ID FROM ETLW_KG.Ask ORDER BY %ID DESC")
+        Job ##class(DataIntegrator.KG.Chat).Run(id)::5
         If '$Test {
             Do ..Mark(id, "error", "could not start the answering job")
         }
@@ -154,12 +154,12 @@ ClassMethod Retrieve(corpusId As %String, question As %String, Output err As %St
     Set err = ""
     Set out = {"chunks": [], "entities": [], "facts": []}
     Try {
-        Set err = ##class(ETLWizard.KG.Embedder).EmbedOne(question, .vector)
+        Set err = ##class(DataIntegrator.KG.Embedder).EmbedOne(question, .vector)
         If err '= "" {
             Return out
         }
-        Set type = ##class(ETLWizard.KG.Setup).#EMBEDTYPE
-        Set dims = ##class(ETLWizard.KG.Setup).#EMBEDDIMS
+        Set type = ##class(DataIntegrator.KG.Setup).#EMBEDTYPE
+        Set dims = ##class(DataIntegrator.KG.Setup).#EMBEDDIMS
 
         Set stmt = ##class(%SQL.Statement).%New()
         // ODBC mode - VECTOR_COSINE is a DOUBLE and reads back as its raw
@@ -185,7 +185,7 @@ ClassMethod Retrieve(corpusId As %String, question As %String, Output err As %St
             }
             Set seen = seen _ $ZConvert(text, "U") _ ","
             Do out.chunks.%Push({"text": (text), "label": (rs.%GetData(2)),
-                                 "score": (##class(ETLWizard.KG.Setup).Round(rs.%GetData(3), 4))})
+                                 "score": (##class(DataIntegrator.KG.Setup).Round(rs.%GetData(3), 4))})
         }
 
         // Entities named outright in the question. Cheap, and it rescues the
@@ -241,14 +241,14 @@ ClassMethod Generate(question As %String, ctx As %DynamicObject, Output err As %
 {
     Set err = ""
     Try {
-        Set sc = ##class(ETLWizard.Agent.ProviderFactory).GetProviderForConfig("ETLWizard", .provider, .model)
+        Set sc = ##class(DataIntegrator.Agent.ProviderFactory).GetProviderForConfig("DataIntegrator", .provider, .model)
         If $$$ISERR(sc) {
-            Set err = "no LLM profile (AI.LLM.ETLWizard): " _ $System.Status.GetErrorText(sc)
+            Set err = "no LLM profile (AI.LLM.DataIntegrator): " _ $System.Status.GetErrorText(sc)
             Return ""
         }
         // The CHAT model, not the extraction model - they are separate roles
         // and cannot be GPU-resident together.
-        Set chatModel = ##class(ETLWizard.KG.Setup).GetChatModel()
+        Set chatModel = ##class(DataIntegrator.KG.Setup).GetChatModel()
         Set agent = ##class(%AI.Agent).%New(provider)
         If chatModel '= "" {
             Set agent.Model = chatModel
@@ -271,7 +271,7 @@ ClassMethod Generate(question As %String, ctx As %DynamicObject, Output err As %
         Set p = p _ nl _ "QUESTION: " _ question _ nl
 
         If ..GetChatMode() = "direct" {
-            Set cfg = ##class(ETLWizard.Agent.Service).StreamConfig()
+            Set cfg = ##class(DataIntegrator.Agent.Service).StreamConfig()
             If cfg.enabled {
                 Return ..AnswerStream(p, askId, cfg, .err)
             }
@@ -283,10 +283,10 @@ ClassMethod Generate(question As %String, ctx As %DynamicObject, Output err As %
         // Same switch as the ETL agent's chat: one setting turns streaming off
         // everywhere. StreamChat returns the same %AI.LLM.Response as Chat, so
         // everything below this is unchanged either way.
-        Set cfg = ##class(ETLWizard.Agent.Service).StreamConfig()
+        Set cfg = ##class(DataIntegrator.Agent.Service).StreamConfig()
         Set sink = $$$NULLOREF
         If cfg.enabled && (askId '= "") {
-            Set sink = ##class(ETLWizard.KG.AskSink).%New()
+            Set sink = ##class(DataIntegrator.KG.AskSink).%New()
             Do sink.StartAsk(askId, cfg.minChars, cfg.minMs)
             Set response = agent.StreamChat(session, p, sink, "OnChunk")
             Do sink.Finish()
@@ -388,7 +388,7 @@ ClassMethod Answer(prompt As %String, askId As %String, Output err As %String) A
             Return ""
         }
         If askId '= "" {
-            Do ##class(ETLWizard.Tools.Util).RunDML(
+            Do ##class(DataIntegrator.Tools.Util).RunDML(
                 "UPDATE ETLW_KG.Ask SET answerSoFar = ?, updatedAt = ? WHERE %ID = ?",
                 $Extract(answer, 1, 30000), $ZDateTime($Horolog, 3), askId)
         }
@@ -456,7 +456,7 @@ ClassMethod AnswerStream(prompt As %String, askId As %String, cfg As %DynamicObj
             "Content-Length: " _ $Length(json) _ crlf _
             "Connection: close" _ crlf _ crlf _ json
 
-        Set sink = ##class(ETLWizard.KG.AskSink).%New()
+        Set sink = ##class(DataIntegrator.KG.AskSink).%New()
         Do sink.StartAsk(askId, cfg.minChars, cfg.minMs)
 
         Set dev = "|TCP|" _ $Job
@@ -592,16 +592,16 @@ ClassMethod AnswerStream(prompt As %String, askId As %String, cfg As %DynamicObj
 ClassMethod Endpoint(Output baseUrl As %String, Output model As %String) As %String [ Internal ]
 {
     Set baseUrl = "", model = ""
-    Set sc = ##class(%ConfigStore.Configuration).GetDetails("AI.LLM.ETLWizard", .details, 0, 1)
+    Set sc = ##class(%ConfigStore.Configuration).GetDetails("AI.LLM.DataIntegrator", .details, 0, 1)
     If $$$ISERR(sc) {
-        Return "no LLM profile (AI.LLM.ETLWizard): " _ $System.Status.GetErrorText(sc)
+        Return "no LLM profile (AI.LLM.DataIntegrator): " _ $System.Status.GetErrorText(sc)
     }
     Set baseUrl = details.%Get("base_url", "")
     If baseUrl = "" {
         Return "the LLM profile has no base_url - the direct chat path needs one " _
-            "(use ##class(ETLWizard.KG.Chat).SetChatMode(""agent"") for a provider without one)"
+            "(use ##class(DataIntegrator.KG.Chat).SetChatMode(""agent"") for a provider without one)"
     }
-    Set model = ##class(ETLWizard.KG.Setup).GetChatModel()
+    Set model = ##class(DataIntegrator.KG.Setup).GetChatModel()
     If model = "" {
         Set model = details.%Get("model", "")
     }
@@ -612,14 +612,14 @@ ClassMethod Endpoint(Output baseUrl As %String, Output model As %String) As %Str
 
 ClassMethod Mark(askId As %String, status As %String, detail As %String) [ Internal ]
 {
-    Do ##class(ETLWizard.Tools.Util).RunDML(
+    Do ##class(DataIntegrator.Tools.Util).RunDML(
         "UPDATE ETLW_KG.Ask SET status = ?, statusDetail = ?, updatedAt = ? WHERE %ID = ?",
         status, $Extract(detail, 1, 1000), $ZDateTime($Horolog, 3), askId)
 }
 
 ClassMethod Finish(askId As %String, answer As %String, ctx As %DynamicObject) [ Internal ]
 {
-    Do ##class(ETLWizard.Tools.Util).RunDML(
+    Do ##class(DataIntegrator.Tools.Util).RunDML(
         "UPDATE ETLW_KG.Ask SET status = 'done', statusDetail = 'answered', answer = ?, hits = ?, updatedAt = ? WHERE %ID = ?",
         $Extract(answer, 1, 30000), $Extract(ctx.%ToJSON(), 1, 30000), $ZDateTime($Horolog, 3), askId)
 }

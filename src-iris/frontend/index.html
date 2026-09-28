@@ -999,7 +999,7 @@ document.getElementById("themeToggle").onclick = () =>
    Two views of the same application, switched live (IMPROVEMENTS_SPEC 1.1).
 
    Resolution order: the session's own choice, then the instance default from
-   GET /wizard/options (^ETLWizard("defaultView")), then "technical" - so an
+   GET /wizard/options (^DataIntegrator("defaultView")), then "technical" - so an
    instance that has never been configured behaves exactly as the product
    always has.
 
@@ -1145,7 +1145,7 @@ function resolveView() {
   if (EXEC()) maybeShowOpeningCard();
 }
 
-const api = p => `${location.origin}/etlwizard/api${p}`;
+const api = p => `${location.origin}/dataintegrator/api${p}`;
 
 /* ---------- Not signed in ------------------------------------------------
    The API requires authentication; the page itself does not, because gating
@@ -1162,7 +1162,7 @@ const api = p => `${location.origin}/etlwizard/api${p}`;
     const res = await realFetch(input, init);
     try {
       const url = typeof input === "string" ? input : (input && input.url) || "";
-      if (res.status === 401 && url.indexOf("/etlwizard/api") >= 0) showSignIn();
+      if (res.status === 401 && url.indexOf("/dataintegrator/api") >= 0) showSignIn();
     } catch (e) { /* never let this break the caller */ }
     return res;
   };
@@ -1479,7 +1479,7 @@ function renderGraph() {
   // (fan-out) at the end. Everything else is the linear middle.
   const sources = arr.filter(n => SOURCE_KINDS.has(n.kind));
   // hosts fan out under the "Production" header; the "production" node itself is
-  // just the container (ETLWizard.Prod.Main), so it is not drawn as its own box.
+  // just the container (DataIntegrator.Prod.Main), so it is not drawn as its own box.
   const prod = arr.filter(n => n.kind === "host");
   const mid = arr.filter(n => !SOURCE_KINDS.has(n.kind) && n.kind !== "host" && n.kind !== "production");
 
@@ -1547,7 +1547,7 @@ function syncWizGraph() {
   const tabs = [...new Set(rawTabs)];   // never show the same source table twice
   tabs.forEach(t => {
     const id = "wiz:src:" + t;
-    nodes.set(id, { nodeId: id, name: "ETLWIZARD." + t, kind: "foreign_table", status: st, order: 10 });
+    nodes.set(id, { nodeId: id, name: "DATAINTEGRATOR." + t, kind: "foreign_table", status: st, order: 10 });
   });
 
   // Transform node appears once we know the tables; its detail sharpens once
@@ -1623,14 +1623,14 @@ function syncWizGraph() {
 function snapshotGraph(pid) {
   if (!pid) return;
   try {
-    localStorage.setItem("etlwizard:graph:" + pid, JSON.stringify({
+    localStorage.setItem("dataintegrator:graph:" + pid, JSON.stringify({
       v: 3, nodes: [...nodes.values()], edges: edges
     }));
   } catch (e) { /* storage full/blocked — fall back to server graph on load */ }
 }
 function restoreGraph(pid) {
   try {
-    const raw = localStorage.getItem("etlwizard:graph:" + pid);
+    const raw = localStorage.getItem("dataintegrator:graph:" + pid);
     if (!raw) return false;
     const g = JSON.parse(raw);
     if (!g || g.v !== 3 || !(g.nodes || []).length) return false;   // ignore stale snapshots
@@ -2129,7 +2129,7 @@ async function wizardStep2() {
         : d.rows.map(r => r.table_schema + "." + r.table_name);
       wrecap(`Source saved: <b>${esc(wiz.sourceType)}</b>` +
         (wiz.mode === "jdbc" ? ` via gateway connection <b>${esc(wiz.connection)}</b>` : ` (dropzone)`) +
-        `. Foreign server <b>ETLWIZARD.${esc(wiz.serverName)}</b> is created and tested. ` +
+        `. Foreign server <b>DATAINTEGRATOR.${esc(wiz.serverName)}</b> is created and tested. ` +
         `I found <b>${items.length}</b> ` + (wiz.mode === "csv" ? "file(s)." : "table(s)."));
       wizardStep3(items);
     });
@@ -2175,7 +2175,7 @@ async function wizardStep2() {
   const PRESETS = {
     PostgreSQL: { driver: "org.postgresql.Driver", url: "jdbc:postgresql://postgres:5432/crm",
                   cp: "/opt/irisbuild/jdbc/postgresql-42.7.4.jar" },
-    IRIS:       { driver: "com.intersystems.jdbc.IRISDriver", url: "jdbc:IRIS://127.0.0.1:1972/ETLWIZARD",
+    IRIS:       { driver: "com.intersystems.jdbc.IRISDriver", url: "jdbc:IRIS://127.0.0.1:1972/DATAINTEGRATOR",
                   cp: "/usr/irissys/dev/java/lib/1.8/intersystems-jdbc-3.10.5.jar" },
     // deliberately blank: the form's placeholders show the shape to type, and a
     // half-filled template is worse than an empty box for an unknown vendor
@@ -2263,7 +2263,7 @@ async function wizardStep2() {
         : d.rows.map(r => r.table_schema + "." + r.table_name);
       card.querySelectorAll("input,select,button").forEach(x => x.disabled = true);
       card.classList.add("locked");
-      wrecap(`Using the existing foreign server <b>ETLWIZARD.${esc(wiz.serverName)}</b> (creation skipped). ` +
+      wrecap(`Using the existing foreign server <b>DATAINTEGRATOR.${esc(wiz.serverName)}</b> (creation skipped). ` +
         `Found <b>${items.length}</b> ` + (wiz.mode === "csv" ? "file(s)." : "table(s)."));
       wizardStep3(items);
     } catch (err) { /* wpost already alerted */ }
@@ -2286,7 +2286,7 @@ async function wizardStepRest() {
     "fetches one page and shows the columns it found &mdash; the data path is detected " +
     "for you (a bare array, or the array inside the response) and every column is " +
     "editable. Nothing is stored until you press <b>Save &amp; mount</b>; then each " +
-    "endpoint becomes <code>ETLWIZARD.&lt;base&gt;_&lt;name&gt;</code> and the transform " +
+    "endpoint becomes <code>DATAINTEGRATOR.&lt;base&gt;_&lt;name&gt;</code> and the transform " +
     "step joins them like any other tables.");
   const card = stepCard(
     `<label>Table prefix <input class="r_base" size="14" value="api"></label>
@@ -2314,7 +2314,7 @@ async function wizardStepRest() {
       msg.classList.add("busyspin"); msg.textContent = "fetching and mounting " + eps.length + " endpoint(s)";
       const j = await wpost("/rest-mount", { baseName: base, endpoints: eps });
       msg.classList.remove("busyspin"); msg.textContent = "";
-      const mounted = (j.mounted || []).map(m => m.table.replace(/^ETLWIZARD\./, ""));
+      const mounted = (j.mounted || []).map(m => m.table.replace(/^DATAINTEGRATOR\./, ""));
       wiz.tables = mounted;
       wiz.localName = mounted[0];
       wrecap(`Mounted ${(j.mounted || []).map(m => `<b>${esc(m.table)}</b> (${m.rows} row(s))`).join(", ")}` +
@@ -2374,7 +2374,7 @@ async function wizardStepRest() {
 }
 
 /* ---------- ODBC branch (IRIS linked tables) ---------- */
-// ODBC sources are mounted as IRIS linked tables exposed as ETLWIZARD.<name>
+// ODBC sources are mounted as IRIS linked tables exposed as DATAINTEGRATOR.<name>
 // views, so the rest of the wizard treats them like any foreign table. Same two
 // screens as JDBC — pick a schema, then tick the tables — except discovery walks
 // the ODBC driver's catalog (there is no foreign server to query THROUGH) and a
@@ -2466,7 +2466,7 @@ async function wizardStepOdbcTables(schema) {
       wiz.odbcLinked = mounted;
       wiz.tables = mounted;              // pre-ticked in the next step
       wiz.localName = mounted[0];
-      wrecap(`Linked ${mounted.map(m => "<b>ETLWIZARD." + esc(m) + "</b>").join(", ")} over ODBC` +
+      wrecap(`Linked ${mounted.map(m => "<b>DATAINTEGRATOR." + esc(m) + "</b>").join(", ")} over ODBC` +
         (failed.length ? ` (failed: ${failed.map(esc).join(", ")})` : "") +
         `. The data stays at the source; IRIS queries it in place.`);
       // Data Sources ends at the mount for every source type — see wizardStep3
@@ -2501,7 +2501,7 @@ function syncBulkGraph() {
   // The file is ingested into a SOURCE table, not an ETL target - and no
   // production is created, so the three host nodes this used to draw would be
   // a picture of something that does not exist.
-  nodes.set(tgtNode, { nodeId: tgtNode, name: "ETLWIZARD.ext_" + base, kind: "source_table",
+  nodes.set(tgtNode, { nodeId: tgtNode, name: "DATAINTEGRATOR.ext_" + base, kind: "source_table",
     status: done ? "succeeded" : "configured", order: 40 });
   edges.push({ from: loadNode, to: tgtNode, label: wiz.bulkStrategy === "append" ? "Append" : "Full reload" });
   renderGraph();
@@ -2511,7 +2511,7 @@ async function wizardStepBulk() {
   wizGraphActive = true; graphFrozen = false; wiz.deployed = false;
   wguide("<b>Bulk load a file.</b> Upload a <b>CSV</b> or <b>XLSX</b> (converted to CSV on the server). " +
     "The rows are ingested <b>once</b> with IRIS <b>LOAD DATA / LOAD BULK DATA</b> into a source table " +
-    "<b>ETLWIZARD.ext_&lt;name&gt;</b>, beside the sources you mounted &mdash; ready to build an ETL from, " +
+    "<b>DATAINTEGRATOR.ext_&lt;name&gt;</b>, beside the sources you mounted &mdash; ready to build an ETL from, " +
     "or to embed on the Knowledge Base tab. No production and no schedule: an uploaded file does not " +
     "change on its own. To import again, upload again.");
   const card = stepCard(
@@ -2528,8 +2528,8 @@ async function wizardStepBulk() {
      </div>
      <span class="b_msg" style="font-size:.76rem;color:var(--ink-soft);width:100%"></span>
      <div class="b_form" style="display:none;width:100%">
-       <label title="The file is ingested into ETLWIZARD.ext_&lt;this name&gt;">Source name <input class="b_base" size="16" value="bulk_data"></label>
-       <span class="w_details b_dest">will create <b>ETLWIZARD.ext_bulk_data</b></span>
+       <label title="The file is ingested into DATAINTEGRATOR.ext_&lt;this name&gt;">Source name <input class="b_base" size="16" value="bulk_data"></label>
+       <span class="w_details b_dest">will create <b>DATAINTEGRATOR.ext_bulk_data</b></span>
        <label>Strategy <select class="b_strat"><option value="full">Full reload</option><option value="append">Append</option></select></label>
        <label title="LOAD BULK DATA is faster but non-atomic">Bulk <input class="b_bulk" type="checkbox" checked style="width:auto"></label>
        <label>Header row <input class="b_header" type="checkbox" checked style="width:auto"></label>
@@ -2565,7 +2565,7 @@ async function wizardStepBulk() {
           `(<b>${load.rowsLoaded}</b> in total) in `
         : `Moved <b>${load.rowsLoaded !== undefined ? load.rowsLoaded : "?"}</b> row(s) into `;
       wrecap(`<b>Ingested.</b> ${moved}` +
-        `<b>${esc(load.target || "ETLWIZARD.ext_" + base)}</b> via ${wiz.bulk ? "LOAD BULK DATA" : "LOAD DATA"}` +
+        `<b>${esc(load.target || "DATAINTEGRATOR.ext_" + base)}</b> via ${wiz.bulk ? "LOAD BULK DATA" : "LOAD DATA"}` +
         (j.note ? `.<br><span class="w_details">${esc(j.note)}</span>` : "") +
         `.<br>It is now a source like any other: build an ETL from it on <b>ETL Interop</b>, ` +
         `or embed it on <b>Knowledge Base</b>. To import again, upload the file again.`);
@@ -2585,7 +2585,7 @@ async function wizardStepBulk() {
   const dest = card.querySelector(".b_dest");
   const showDest = () => {
     const v = (baseInp.value || "").trim().replace(/^ext_/i, "");
-    dest.innerHTML = v ? `will create <b>ETLWIZARD.ext_${esc(v)}</b>` : "";
+    dest.innerHTML = v ? `will create <b>DATAINTEGRATOR.ext_${esc(v)}</b>` : "";
   };
   baseInp.oninput = showDest;
 
@@ -2705,7 +2705,7 @@ function wizardStep3(items) {
       if (!mounted.length) throw new Error("nothing mounted");
       wiz.tables = mounted;              // pre-ticked in the next step
       wiz.localName = mounted[0];
-      wrecap(`Mounted ${mounted.map(m => "<b>ETLWIZARD." + esc(m) + "</b>").join(", ")}` +
+      wrecap(`Mounted ${mounted.map(m => "<b>DATAINTEGRATOR." + esc(m) + "</b>").join(", ")}` +
         (failed.length ? ` (failed: ${failed.map(esc).join(", ")})` : "") +
         `. The data stays at the source; IRIS queries it in place.`);
       // Data Sources ends here. Mounting is standing configuration, not the
@@ -3056,7 +3056,7 @@ async function wizardStepStrategy() {
         strategy,
         watermarkColumn: c.querySelector(".s_wm").value,
         pipelineName: wiz.pipelineName,
-        sources: (wiz.tables || []).map(t => "ETLWIZARD." + t) }, readWhen(c)));
+        sources: (wiz.tables || []).map(t => "DATAINTEGRATOR." + t) }, readWhen(c)));
       // Keep the faithful preview as the FINAL flowchart (tables node included)
       // and enrich it with the deployed staging + production hosts, marking every
       // part deployed. We do NOT swap to the server graph, which omits the sources.
@@ -3189,7 +3189,7 @@ async function offerTransformChoice() {
   const rows = tables.map(t =>
     `<label style="display:flex;gap:.4rem;align-items:center;width:100%;font-variant:normal;letter-spacing:0" title="${esc((t.columns || []).join(', '))}">
        <input type="checkbox" class="t_pick" value="${esc(t.name)}" ${(t.own || t.name === wiz.localName || (wiz.tables || []).indexOf(t.name) >= 0) ? "checked" : ""} style="width:auto">
-       <code style="font-size:.8rem">ETLWIZARD.${esc(t.name)}</code>
+       <code style="font-size:.8rem">DATAINTEGRATOR.${esc(t.name)}</code>
        <span style="font-size:.72rem;color:var(--ink-soft)">${esc((t.columns || []).slice(0, 6).join(", "))}${(t.columns || []).length > 6 ? ", ..." : ""}</span>
      </label>`).join("");
 
@@ -3216,7 +3216,7 @@ async function offerTransformChoice() {
     });
 
   // Profile the first ticked foreign table HERE (not at mount time): its columns,
-  // row count and watermark candidates. Reads the mounted ETLWIZARD table directly,
+  // row count and watermark candidates. Reads the mounted DATAINTEGRATOR table directly,
   // so it works for tables mounted just now AND ones that already existed (Skip).
   // Feeds wiz.rowCount / wiz.wmCandidates / wiz.suggestBase to the strategy step.
   const details = card.querySelector(".w_details");
@@ -3226,11 +3226,11 @@ async function offerTransformChoice() {
     if (!first) { details.textContent = ""; return; }
     const t = first.value;
     wiz.suggestBase = t;
-    details.textContent = "profiling ETLWIZARD." + t + "...";
+    details.textContent = "profiling DATAINTEGRATOR." + t + "...";
     try {
       // first real action in this tab — now the ETL needs a pipeline of its own
       await ensureEtlSession();
-      const prev = await wpost("/transform-preview", { sql: "SELECT * FROM ETLWIZARD." + t, maxRows: 3 });
+      const prev = await wpost("/transform-preview", { sql: "SELECT * FROM DATAINTEGRATOR." + t, maxRows: 3 });
       const parsed = splitTopLevel(prev.columnDefs || "").map(d => {
         const p = d.trim().split(/\s+/);
         return { column: p[0], dataType: (p[1] || "").toLowerCase() };
@@ -3239,14 +3239,14 @@ async function offerTransformChoice() {
       wiz.pk = "";   // foreign tables carry no PK metadata — the agent suggests it later
       let rowCount = 0;
       try {
-        const rc = await wpost("/transform-preview", { sql: "SELECT COUNT(*) AS row_count FROM ETLWIZARD." + t, maxRows: 1 });
+        const rc = await wpost("/transform-preview", { sql: "SELECT COUNT(*) AS row_count FROM DATAINTEGRATOR." + t, maxRows: 1 });
         rowCount = +((((rc.sample || {}).rows || [{}])[0] || {}).row_count || 0);
       } catch (e) { /* count is advisory */ }
       wiz.rowCount = rowCount;
-      details.innerHTML = `<b>ETLWIZARD.${esc(t)}</b>: ${parsed.length} columns &middot; ~${rowCount} rows &middot; ` +
+      details.innerHTML = `<b>DATAINTEGRATOR.${esc(t)}</b>: ${parsed.length} columns &middot; ~${rowCount} rows &middot; ` +
         `watermark candidates: ${esc(wiz.wmCandidates.map(x => x.column).join(", ") || "none")}`;
     } catch (e) {
-      details.textContent = "could not profile ETLWIZARD." + t;
+      details.textContent = "could not profile DATAINTEGRATOR." + t;
     }
   };
   // Live flowchart: reflect exactly the tables ticked right now, updating as the
@@ -3270,9 +3270,9 @@ async function offerTransformChoice() {
 function joinScaffold(tables) {
   const al = i => String.fromCharCode(97 + i);
   const cols = tables.map((t, i) => `${al(i)}.*`).join(", ");
-  let sql = `SELECT ${cols}\nFROM ETLWIZARD.${tables[0]} ${al(0)}`;
+  let sql = `SELECT ${cols}\nFROM DATAINTEGRATOR.${tables[0]} ${al(0)}`;
   for (let i = 1; i < tables.length; i++) {
-    sql += `\nJOIN ETLWIZARD.${tables[i]} ${al(i)} ON /* working out the key... */`;
+    sql += `\nJOIN DATAINTEGRATOR.${tables[i]} ${al(i)} ON /* working out the key... */`;
   }
   return sql;
 }
@@ -3285,13 +3285,13 @@ async function wizardStepTransform(prefillSql) {
     : (multi ? joinScaffold(picked)
     : `SELECT
     a.*                                                 -- start from every column
-FROM ETLWIZARD.${first} a
+FROM DATAINTEGRATOR.${first} a
 -- cleansing:      UPPER(a.col), COALESCE(a.col,'n/a'), TRIM(a.col), CASE ...
 -- derivation:     (a.x - a.y) AS margin
 -- aggregation:    COUNT(*) AS n, SUM(a.amount) AS total  + GROUP BY
 -- filtering:      WHERE a.status = 'paid'`);
   wguide("<b>The load SQL.</b> Tables in this ETL: " +
-    (picked.length ? picked.map(t => `<code>ETLWIZARD.${esc(t)}</code>`).join(", ") : "<i>none selected</i>") +
+    (picked.length ? picked.map(t => `<code>DATAINTEGRATOR.${esc(t)}</code>`).join(", ") : "<i>none selected</i>") +
     (multi ? "<br>The join keys are left blank &mdash; fill them in, or press <b>Generate SQL</b> and the model works them out." : "") +
     "<br>You can describe any transformation in plain words (cleansing, standardization, " +
     "derivation, aggregation, filtering) and the model rewrites the SQL, or edit it by hand. " +
@@ -3411,7 +3411,7 @@ function connect() {
   try {
     if (ws) { ws.onclose = null; ws.onerror = null; ws.close(); }
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    ws = new WebSocket(`${proto}://${location.host}/etlwizard/ETLWizard.WS.Hub.cls`);
+    ws = new WebSocket(`${proto}://${location.host}/dataintegrator/DataIntegrator.WS.Hub.cls`);
     ws.onopen = () => { setStatus(`connected &middot; run ${runId} &middot; live`); ws.send(JSON.stringify({ runId, lastSeq })); };
     ws.onmessage = m => {
       const ev = JSON.parse(m.data);
@@ -4190,7 +4190,7 @@ function configuredSources() {
   const SEP = " - ";
   // Foreign servers, NOT connections: /discover reads a server, and a server's
   // name has nothing to do with the connection it wraps. Listing connections
-  // here is what produced "Foreign server 'ETLWIZARD.pg_crm_connection' not
+  // here is what produced "Foreign server 'DATAINTEGRATOR.pg_crm_connection' not
   // found" - that name is a connection, and no server of that name exists.
   (OPT.foreignServers || []).forEach(s => out.push({
     id: "fs:" + s.name, mode: s.mode, server: s.name, conn: s.via,
@@ -4242,7 +4242,7 @@ async function renderSourcesTab() {
       const items = pick.mode === "csv"
         ? (d.files || []).map(f => f.name)
         : (d.rows || []).map(r => r.table_schema + "." + r.table_name);
-      wrecap(`<b>ETLWIZARD.${esc(pick.server)}</b> exposes <b>${items.length}</b> ` +
+      wrecap(`<b>DATAINTEGRATOR.${esc(pick.server)}</b> exposes <b>${items.length}</b> ` +
         (pick.mode === "csv" ? "file(s)." : "table(s)."));
       wizardStep3(items);
     } catch (err) { /* wpost already alerted */ }
@@ -4413,7 +4413,7 @@ async function mlTables() {
   } catch (e) { /* fall through to the mounted sources */ }
   try {
     const j = await (await fetch(api("/mountable"))).json();
-    (j.foreignTables || []).forEach(t => add("ETLWIZARD." + t.name));
+    (j.foreignTables || []).forEach(t => add("DATAINTEGRATOR." + t.name));
   } catch (e) { /* nothing mounted, or not signed in */ }
   return out;
 }
@@ -5313,7 +5313,7 @@ function mcpStepConnect(res) {
     mcpServers: {
       "iris-data-integrator": {
         command: "docker",
-        args: ["exec", "-i", "irisetlwizard-iris-1", "/usr/irissys/bin/iris-mcp-server",
+        args: ["exec", "-i", "dataintegrator-iris-1", "/usr/irissys/bin/iris-mcp-server",
                "--transport=stdio", "--config=/opt/irisbuild/config.toml", "run"]
       }
     }

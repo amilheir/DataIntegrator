@@ -3,7 +3,7 @@
 /// of spec §16.3: identifier validation, SELECT-only passthrough, single
 /// statement, bounded reads, and the standard result envelope
 /// {rows, row_count, truncated, elapsed_ms}.
-Class ETLWizard.Tools.Util Extends %RegisteredObject
+Class DataIntegrator.Tools.Util Extends %RegisteredObject
 {
 
 /// Bare SQL identifier: letter followed by letters/digits/underscores.
@@ -109,7 +109,7 @@ ClassMethod RunSelect(sql As %String, maxRows As %Integer = 50) As %String
 
 /// Execute a SELECT-only passthrough query on a foreign server:
 /// THROUGH <server> <remoteSql> (spec §4.2, §6.2). serverName is the bare
-/// name within the ETLWIZARD schema.
+/// name within the DATAINTEGRATOR schema.
 ClassMethod Through(serverName As %String, remoteSql As %String, maxRows As %Integer = 50) As %String
 {
     If '..ValidIdent(serverName) {
@@ -118,7 +118,7 @@ ClassMethod Through(serverName As %String, remoteSql As %String, maxRows As %Int
     If '..IsSelectOnly(remoteSql) {
         Return "ERROR: passthrough queries must be a single SELECT statement"
     }
-    Return ..RunSelect("THROUGH SERVER ETLWIZARD." _ serverName _ " " _ remoteSql, maxRows)
+    Return ..RunSelect("THROUGH SERVER DATAINTEGRATOR." _ serverName _ " " _ remoteSql, maxRows)
 }
 
 /// Execute a single DDL statement (already validated/assembled by the caller).
@@ -550,7 +550,7 @@ ClassMethod ODBCToDDL(odbc As %Integer, precision As %Integer, scale As %Integer
 /// Record a DAG node + node.created event (shared by DDL tools).
 ClassMethod CatalogNode(runId As %String, kind As %String, name As %String, sqlText As %String = "", configJson As %String = "") As %String
 {
-    Set cat = ##class(ETLWizard.Tools.Catalog).%New()
+    Set cat = ##class(DataIntegrator.Tools.Catalog).%New()
     Return cat.CatalogRecord(runId, kind, name, sqlText, configJson)
 }
 

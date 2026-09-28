@@ -1,6 +1,7 @@
+name: dataintegrator
 services:
   iris:
-    hostname: iris-etlwizard
+    hostname: iris-dataintegrator
     # Room for the WIJ flush when something does stop this gracefully. This is
     # NOT sufficient on its own — IRIS does not trap SIGTERM, so a plain
     # `docker compose down` still ends in SIGKILL and can roll back recent
@@ -47,7 +48,7 @@ services:
     # AND startup.sh has finished, so `docker compose up --wait` returns when
     # the app is ready to use.
     healthcheck:
-      test: ["CMD-SHELL", "iris qlist IRIS | grep -q '\\^running' && test -f /tmp/etlwizard-ready"]
+      test: ["CMD-SHELL", "iris qlist IRIS | grep -q '\\^running' && test -f /tmp/dataintegrator-ready"]
       interval: 15s
       timeout: 10s
       start_period: 300s

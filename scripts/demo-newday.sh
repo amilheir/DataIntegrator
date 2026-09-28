@@ -10,7 +10,7 @@
 
 set -e
 
-PG_CONTAINER="${PG_CONTAINER:-irisetlwizard-postgres-1}"
+PG_CONTAINER="${PG_CONTAINER:-dataintegrator-postgres-1}"
 PG_USER="${PG_USER:-crm}"
 PG_DB="${PG_DB:-crm}"
 DROPZONE="${DROPZONE:-$(dirname "$0")/../src-iris/dropzone}"
